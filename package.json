@@ -8,8 +8,12 @@
     "build": "npx tsc",
     "watch": "npx tsc -w"
   },
-  "author": "",
-  "license": "ISC",
+  "author": "John Franke",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jottenlips/garminclimb.git"
+  },
+  "license": "MIT",
   "devDependencies": {
     "bun-types": "latest"
   },

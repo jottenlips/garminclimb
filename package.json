@@ -1,0 +1,31 @@
+{
+  "name": "garminclimb",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "npx tsc",
+    "watch": "npx tsc -w"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "bun-types": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@types/node": "^22.13.5",
+    "asciichart": "^1.5.25",
+    "commander": "^13.1.0",
+    "dotenv": "^16.4.7",
+    "garmin-connect": "^1.6.2",
+    "simple-ascii-chart": "^4.2.0",
+    "yargs": "^17.7.2"
+  },
+  "bin": {
+    "garminclimb": "./bin/index.js"
+  }
+}

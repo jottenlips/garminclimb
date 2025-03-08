@@ -6,8 +6,7 @@ Garmin connect doesn't have the charts I want so I decided to make my own CLI to
 
 ```shell
 npm i -g garminclimb
-garminclimb login -u username -p password
-garminclimb download # download your data
+garminclimb download -u username -p password # download your data
 garminclimb charts
 ```
 

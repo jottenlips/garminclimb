@@ -1,25 +1,18 @@
-import * as dotenv from "dotenv";
-
-const path = require("path");
-const homeDir = require("os").homedir();
-export const credentialsPath = path.join(homeDir, ".gc_credentials");
-dotenv.config({ path: credentialsPath });
-
 import * as fs from "fs";
 // @ts-ignore
 import { GarminConnect } from "garmin-connect";
 import { garminDataFolder } from ".";
-export const download = async (): Promise<void> => {
+export const download = async (
+  username: string,
+  password: string
+): Promise<void> => {
   const GCClient = new GarminConnect({
-    username: process.env.GARMIN_USERNAME || "",
-    password: process.env.GARMIN_PASSWORD || "",
+    username,
+    password,
   });
 
-  await GCClient.login(
-    process.env.GARMIN_USERNAME || "",
-    process.env.GARMIN_PASSWORD || ""
-  );
-  
+  await GCClient.login(username, password);
+
   const activities = await GCClient.getActivities();
 
   const indoorClimbingActivities = activities?.filter(

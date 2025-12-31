@@ -181,6 +181,119 @@ export const parse = async () => {
     }
   );
 
+  // max rope grade per month
+  const maxGradeByMonthYear = activeIndoorSplits?.reduce(
+    (acc: any, split: any) => {
+      const month = split?.start?.split(" ")[0].split("-")[1];
+      const year = split?.start?.split(" ")[0].split("-")[0];
+      acc[`${year}-${month}`] = Math.max(
+        acc[`${year}-${month}`] || 0,
+        YDS_GRADE_MAP?.[split?.maxGradeValue?.valueKey]
+      );
+      return acc;
+    },
+    {}
+  );
+
+  generateChart(
+    Object.keys(maxGradeByMonthYear).map((month: string, index) => [
+      index,
+      maxGradeByMonthYear[month],
+    ]),
+    "Max Rope Grade By Month",
+    {
+      // height: 20,
+      width: YEAR_WIDTH,
+      formatter: (value: number, { axis }: any) =>
+        axis === "y"
+          ? `${numberToGrade(value)}`
+          : Object.keys(maxGradeByMonthYear)[value],
+    }
+  );
+
+  const maxBoulderGradeByMonthYear = activeBoulderingSplits?.reduce(
+    (acc: any, split: any) => {
+      const month = split?.start?.split(" ")[0].split("-")[1];
+      const year = split?.start?.split(" ")[0].split("-")[0];
+      acc[`${year}-${month}`] = Math.max(
+        acc[`${year}-${month}`] || 0,
+        parseInt(split?.maxGradeValue?.valueKey?.replace(/\D/g, ""))
+      );
+      return acc;
+    },
+    {}
+  );
+
+  generateChart(
+    Object.keys(maxBoulderGradeByMonthYear).map((month: string, index) => [
+      index,
+      maxBoulderGradeByMonthYear[month],
+    ]),
+    "Max Boulder Grade By Month",
+    {
+      // height: 20,
+      width: YEAR_WIDTH,
+      formatter: (value: number, { axis }: any) =>
+        axis === "y"
+          ? `V${value}`
+          : Object.keys(maxBoulderGradeByMonthYear)[value],
+    }
+  );
+
+  const numberOfRopeSessionsByMonthYear = activeIndoorSplits?.reduce(
+    (acc: any, split: any) => {
+      const month = split?.start?.split(" ")[0].split("-")[1];
+      const year = split?.start?.split(" ")[0].split("-")[0];
+      acc[`${year}-${month}`] = (acc[`${year}-${month}`] || 0) + 1;
+      return acc;
+    },
+    {}
+  );
+
+  generateChart(
+    Object.keys(numberOfRopeSessionsByMonthYear).map((month: string, index) => [
+      index,
+      numberOfRopeSessionsByMonthYear[month],
+    ]),
+    "Number of Rope Sessions By Month",
+    {
+      // height: 20,
+      width: YEAR_WIDTH,
+      formatter: (value: number, { axis }: any) =>
+        axis === "y"
+          ? value
+          : Object.keys(numberOfRopeSessionsByMonthYear)[value],
+    }
+  );
+
+  const numberOfBoulderSessionsByMonthYear = activeBoulderingSplits?.reduce(
+    (acc: any, split: any) => {
+      const month = split?.start?.split(" ")[0].split("-")[1];
+      const year = split?.start?.split(" ")[0].split("-")[0];
+      acc[`${year}-${month}`] = (acc[`${year}-${month}`] || 0) + 1;
+      return acc;
+    },
+    {}
+  );
+
+  generateChart(
+    Object.keys(numberOfBoulderSessionsByMonthYear).map(
+      (month: string, index) => [
+        index,
+        numberOfBoulderSessionsByMonthYear[month],
+      ]
+    ),
+    "Number of Boulder Sessions By Month",
+    {
+      // height: 20,
+      width: YEAR_WIDTH,
+      formatter: (value: number, { axis }: any) =>
+        axis === "y"
+          ? value
+          : Object.keys(numberOfBoulderSessionsByMonthYear)[value],
+    }
+  );
+
   console.log("```");
 
   console.log("```");

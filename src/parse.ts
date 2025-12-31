@@ -115,6 +115,33 @@ export const parse = async () => {
       return acc;
     }, {});
 
+  // each boulder is ~8 feet
+  const totalFeetByMonthYearBouldering = activeBoulderingSplits
+    // ?.reverse()
+    ?.reduce((acc: any, split: any) => {
+      const month = split?.start?.split(" ")[0].split("-")[1];
+      const year = split?.start?.split(" ")[0].split("-")[0];
+      acc[`${year}-${month}`] =
+        (acc[`${year}-${month}`] || 0) + split?.noOfSplits * 8;
+      return acc;
+    }, {});
+
+  const totalFeetByMonthYearCombined = Object.keys(totalFeetByMonthYear).reduce(
+    (acc: any, key: string) => {
+      acc[key] =
+        totalFeetByMonthYear[key] + (totalFeetByMonthYearBouldering[key] || 0);
+      return acc;
+    },
+    {}
+  );
+
+  const totalFeet = Object.values(totalFeetByMonthYearCombined).reduce(
+    //@ts-ignore
+    (sum: number, feet: number) => sum + feet,
+    0
+  );
+  console.log(`All Time Total Feet Climbed: ${totalFeet} ft\n`);
+
   generateChart(
     Object.keys(totalFeetByMonthYear).map((month: string, index) => [
       index,
@@ -129,17 +156,6 @@ export const parse = async () => {
         axis === "y" ? value : Object.keys(totalFeetByMonthYear)[value],
     }
   );
-
-  // each boulder is ~8 feet
-  const totalFeetByMonthYearBouldering = activeBoulderingSplits
-    // ?.reverse()
-    ?.reduce((acc: any, split: any) => {
-      const month = split?.start?.split(" ")[0].split("-")[1];
-      const year = split?.start?.split(" ")[0].split("-")[0];
-      acc[`${year}-${month}`] =
-        (acc[`${year}-${month}`] || 0) + split?.noOfSplits * 8;
-      return acc;
-    }, {});
 
   generateChart(
     Object.keys(totalFeetByMonthYearBouldering).map((month: string, index) => [
@@ -158,14 +174,6 @@ export const parse = async () => {
     }
   );
 
-  const totalFeetByMonthYearCombined = Object.keys(totalFeetByMonthYear).reduce(
-    (acc: any, key: string) => {
-      acc[key] =
-        totalFeetByMonthYear[key] + (totalFeetByMonthYearBouldering[key] || 0);
-      return acc;
-    },
-    {}
-  );
   generateChart(
     Object.keys(totalFeetByMonthYearCombined).map((month: string, index) => [
       index,

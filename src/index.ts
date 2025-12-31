@@ -23,7 +23,6 @@ program
   .command("charts")
   .description("Parse activities from Garmin Connect")
   .action(() => {
-    console.log("Parsing activities...");
     parse();
   });
 

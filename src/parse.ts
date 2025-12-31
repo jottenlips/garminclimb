@@ -76,7 +76,7 @@ const numberToGrade = (number: number): string => {
 export const parse = async () => {
   const indoorClimbingActivities = JSON.parse(
     fs.readFileSync(`${garminDataFolder}/indoorClimbingActivities.json`, "utf8")
-  );
+  )?.reverse();
 
   const activeIndoorSplits = indoorClimbingActivities.map((activity: any) =>
     activity?.splitSummaries?.[0]?.splitType === "CLIMB_ACTIVE"
@@ -86,10 +86,9 @@ export const parse = async () => {
 
   const boulderingActivities = JSON.parse(
     fs.readFileSync(`${garminDataFolder}/boulderingActivities.json`, "utf8")
-  );
+  )?.reverse();
 
   const activeBoulderingSplits = boulderingActivities
-    ?.reverse()
     .map((activity: any) =>
       activity?.splitSummaries?.[0]?.splitType === "CLIMB_ACTIVE"
         ? { ...activity?.splitSummaries?.[0], start: activity?.startTimeLocal }
@@ -104,9 +103,91 @@ export const parse = async () => {
     console.log(plot(data, options));
   };
 
+  console.log("```");
+
+  const totalFeetByMonthYear = activeIndoorSplits
+    // ?.reverse()
+    ?.reduce((acc: any, split: any) => {
+      const month = split?.start?.split(" ")[0].split("-")[1];
+      const year = split?.start?.split(" ")[0].split("-")[0];
+      acc[`${year}-${month}`] =
+        (acc[`${year}-${month}`] || 0) + metersToFeet(split?.totalAscent);
+      return acc;
+    }, {});
+
+  generateChart(
+    Object.keys(totalFeetByMonthYear).map((month: string, index) => [
+      index,
+      totalFeetByMonthYear[month],
+    ]),
+    "Total Route Feet By Month",
+    {
+      height: 20,
+      width: YEAR_WIDTH,
+      barChart: true,
+      formatter: (value: number, { axis }: any) =>
+        axis === "y" ? value : Object.keys(totalFeetByMonthYear)[value],
+    }
+  );
+
+  // each boulder is ~8 feet
+  const totalFeetByMonthYearBouldering = activeBoulderingSplits
+    // ?.reverse()
+    ?.reduce((acc: any, split: any) => {
+      const month = split?.start?.split(" ")[0].split("-")[1];
+      const year = split?.start?.split(" ")[0].split("-")[0];
+      acc[`${year}-${month}`] =
+        (acc[`${year}-${month}`] || 0) + split?.noOfSplits * 8;
+      return acc;
+    }, {});
+
+  generateChart(
+    Object.keys(totalFeetByMonthYearBouldering).map((month: string, index) => [
+      index,
+      totalFeetByMonthYearBouldering[month],
+    ]),
+    "Approx Boulder Feet By Month",
+    {
+      height: 20,
+      width: YEAR_WIDTH,
+      barChart: true,
+      formatter: (value: number, { axis }: any) =>
+        axis === "y"
+          ? value
+          : Object.keys(totalFeetByMonthYearBouldering)[value],
+    }
+  );
+
+  const totalFeetByMonthYearCombined = Object.keys(totalFeetByMonthYear).reduce(
+    (acc: any, key: string) => {
+      acc[key] =
+        totalFeetByMonthYear[key] + (totalFeetByMonthYearBouldering[key] || 0);
+      return acc;
+    },
+    {}
+  );
+  generateChart(
+    Object.keys(totalFeetByMonthYearCombined).map((month: string, index) => [
+      index,
+      totalFeetByMonthYearCombined[month],
+    ]),
+    "Total Feet By Month Combined",
+    {
+      height: 20,
+      width: YEAR_WIDTH,
+      barChart: true,
+      formatter: (value: number, { axis }: any) =>
+        axis === "y" ? value : Object.keys(totalFeetByMonthYearCombined)[value],
+    }
+  );
+
+  console.log("```");
+
+  console.log("```");
+
   generateChart(
     activeIndoorSplits
-      ?.reverse()
+      // ?.reverse()
       .map((split: any, index: number) => [
         index,
         YDS_GRADE_MAP?.[split?.maxGradeValue?.valueKey],
@@ -147,32 +228,6 @@ export const parse = async () => {
       barChart: true,
       formatter: (value: number, { axis }: any) =>
         axis === "y" ? value : activeIndoorSplits[value]?.start?.split(" ")[0],
-    }
-  );
-
-  const totalFeetByMonthYear = activeIndoorSplits?.reduce(
-    (acc: any, split: any) => {
-      const month = split?.start?.split(" ")[0].split("-")[1];
-      const year = split?.start?.split(" ")[0].split("-")[0];
-      acc[`${year}-${month}`] =
-        (acc[`${year}-${month}`] || 0) + metersToFeet(split?.totalAscent);
-      return acc;
-    },
-    {}
-  );
-
-  generateChart(
-    Object.keys(totalFeetByMonthYear).map((month: string, index) => [
-      index,
-      totalFeetByMonthYear[month],
-    ]),
-    "Total Route Feet By Month",
-    {
-      height: 20,
-      width: YEAR_WIDTH,
-      barChart: true,
-      formatter: (value: number, { axis }: any) =>
-        axis === "y" ? value : Object.keys(totalFeetByMonthYear)[value],
     }
   );
 
@@ -242,55 +297,5 @@ export const parse = async () => {
     }
   );
 
-  // each boulder is ~8 feet
-  const totalFeetByMonthYearBouldering = activeBoulderingSplits?.reduce(
-    (acc: any, split: any) => {
-      const month = split?.start?.split(" ")[0].split("-")[1];
-      const year = split?.start?.split(" ")[0].split("-")[0];
-      acc[`${year}-${month}`] =
-        (acc[`${year}-${month}`] || 0) + split?.noOfSplits * 8;
-      return acc;
-    },
-    {}
-  );
-
-  generateChart(
-    Object.keys(totalFeetByMonthYearBouldering).map((month: string, index) => [
-      index,
-      totalFeetByMonthYearBouldering[month],
-    ]),
-    "Approx Boulder Feet By Month",
-    {
-      height: 20,
-      width: YEAR_WIDTH,
-      barChart: true,
-      formatter: (value: number, { axis }: any) =>
-        axis === "y"
-          ? value
-          : Object.keys(totalFeetByMonthYearBouldering)[value],
-    }
-  );
-
-  const totalFeetByMonthYearCombined = Object.keys(totalFeetByMonthYear).reduce(
-    (acc: any, key: string) => {
-      acc[key] =
-        totalFeetByMonthYear[key] + (totalFeetByMonthYearBouldering[key] || 0);
-      return acc;
-    },
-    {}
-  );
-  generateChart(
-    Object.keys(totalFeetByMonthYearCombined).map((month: string, index) => [
-      index,
-      totalFeetByMonthYearCombined[month],
-    ]),
-    "Total Feet By Month Combined",
-    {
-      height: 20,
-      width: YEAR_WIDTH,
-      barChart: true,
-      formatter: (value: number, { axis }: any) =>
-        axis === "y" ? value : Object.keys(totalFeetByMonthYearCombined)[value],
-    }
-  );
+  console.log("```");
 };

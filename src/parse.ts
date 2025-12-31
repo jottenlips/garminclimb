@@ -5,6 +5,7 @@ type YDSGradeMap = { [key: string]: number };
 import { garminDataFolder } from ".";
 
 const YEAR_WIDTH = 12 * 10;
+const CHART_WIDTH_PER_DATA_POINT = 12;
 
 const YDS_GRADE_MAP: YDSGradeMap = {
   _5_6: 0,
@@ -112,7 +113,7 @@ export const parse = async () => {
       ]),
     "Max Grade Per Session Indoor Climbing",
     {
-      width: activeIndoorSplits?.length * 10,
+      width: activeIndoorSplits?.length * CHART_WIDTH_PER_DATA_POINT,
       formatter: (value: number, { axis }: any) =>
         axis === "y"
           ? `${numberToGrade(value)}`
@@ -128,7 +129,7 @@ export const parse = async () => {
     "Number of Sends per session",
     {
       height: 20,
-      width: activeIndoorSplits?.length * 10,
+      width: activeIndoorSplits?.length * CHART_WIDTH_PER_DATA_POINT,
       formatter: (value: number, { axis }: any) =>
         axis === "y" ? value : activeIndoorSplits[value]?.start?.split(" ")[0],
     }
@@ -142,7 +143,7 @@ export const parse = async () => {
     "Total Feet Per Session",
     {
       height: 10,
-      width: activeIndoorSplits?.length * 10,
+      width: activeIndoorSplits?.length * CHART_WIDTH_PER_DATA_POINT,
       barChart: true,
       formatter: (value: number, { axis }: any) =>
         axis === "y" ? value : activeIndoorSplits[value]?.start?.split(" ")[0],
@@ -184,7 +185,7 @@ export const parse = async () => {
     {
       height: 20,
       barChart: true,
-      width: activeIndoorSplits?.length * 10,
+      width: activeIndoorSplits?.length * CHART_WIDTH_PER_DATA_POINT,
       formatter: (value: number, { axis }: any) =>
         axis === "y" ? value : activeIndoorSplits[value]?.start?.split(" ")[0],
     }
@@ -199,7 +200,7 @@ export const parse = async () => {
     "Max Grade Per Session Bouldering",
     {
       height: 10,
-      width: activeBoulderingSplits?.length * 10,
+      width: activeBoulderingSplits?.length * CHART_WIDTH_PER_DATA_POINT,
       formatter: (value: number, { axis }: any) =>
         axis === "y"
           ? `V${value}`
@@ -216,7 +217,7 @@ export const parse = async () => {
     {
       height: 10,
       barChart: true,
-      width: activeBoulderingSplits?.length * 10,
+      width: activeBoulderingSplits?.length * CHART_WIDTH_PER_DATA_POINT,
       formatter: (value: number, { axis }: any) =>
         axis === "y"
           ? value
@@ -233,7 +234,7 @@ export const parse = async () => {
     {
       height: 10,
       barChart: true,
-      width: activeBoulderingSplits?.length * 10,
+      width: activeBoulderingSplits?.length * CHART_WIDTH_PER_DATA_POINT,
       formatter: (value: number, { axis }: any) =>
         axis === "y"
           ? value

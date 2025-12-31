@@ -4,6 +4,8 @@ import plot from "simple-ascii-chart";
 type YDSGradeMap = { [key: string]: number };
 import { garminDataFolder } from ".";
 
+const YEAR_WIDTH = 12 * 10;
+
 const YDS_GRADE_MAP: YDSGradeMap = {
   _5_6: 0,
   _5_7: 1,
@@ -166,7 +168,7 @@ export const parse = async () => {
     "Total Route Feet By Month",
     {
       height: 20,
-      width: 20,
+      width: YEAR_WIDTH,
       barChart: true,
       formatter: (value: number, { axis }: any) =>
         axis === "y" ? value : Object.keys(totalFeetByMonthYear)[value],
@@ -259,7 +261,7 @@ export const parse = async () => {
     "Approx Boulder Feet By Month",
     {
       height: 20,
-      width: 20,
+      width: YEAR_WIDTH,
       barChart: true,
       formatter: (value: number, { axis }: any) =>
         axis === "y"
@@ -284,7 +286,7 @@ export const parse = async () => {
     "Total Feet By Month Combined",
     {
       height: 20,
-      width: 20,
+      width: YEAR_WIDTH,
       barChart: true,
       formatter: (value: number, { axis }: any) =>
         axis === "y" ? value : Object.keys(totalFeetByMonthYearCombined)[value],

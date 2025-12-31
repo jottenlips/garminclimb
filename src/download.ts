@@ -2,6 +2,10 @@ import * as fs from "fs";
 // @ts-ignore
 import { GarminConnect } from "garmin-connect";
 import { garminDataFolder } from ".";
+import {
+  ActivitySubType,
+  ActivityType,
+} from "garmin-connect/dist/garmin/types/activity";
 export const download = async (
   username: string,
   password: string
@@ -13,7 +17,13 @@ export const download = async (
 
   await GCClient.login(username, password);
 
-  const activities = await GCClient.getActivities();
+  const activities = await GCClient.getActivities(
+    0,
+    6000,
+    ActivityType.FitnessEquipment,
+    // @ts-ignore
+    "indoor_climbing"
+  );
 
   const indoorClimbingActivities = activities?.filter(
     (activity) => activity?.activityType?.typeKey === "indoor_climbing"

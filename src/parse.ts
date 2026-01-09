@@ -149,7 +149,7 @@ export const parse = async () => {
     ]),
     "Total Route Feet By Month",
     {
-      height: 20,
+      height: 10,
       width: YEAR_WIDTH,
       barChart: true,
       formatter: (value: number, { axis }: any) =>
@@ -164,7 +164,7 @@ export const parse = async () => {
     ]),
     "Approx Boulder Feet By Month",
     {
-      height: 20,
+      height: 10,
       width: YEAR_WIDTH,
       barChart: true,
       formatter: (value: number, { axis }: any) =>
@@ -181,7 +181,7 @@ export const parse = async () => {
     ]),
     "Total Feet By Month Combined",
     {
-      height: 20,
+      height: 10,
       width: YEAR_WIDTH,
       barChart: true,
       formatter: (value: number, { axis }: any) =>

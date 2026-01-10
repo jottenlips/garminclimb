@@ -76,7 +76,8 @@ const numberToGrade = (number: number): string => {
 export const parse = async () => {
   const indoorClimbingActivities = JSON.parse(
     fs.readFileSync(`${garminDataFolder}/indoorClimbingActivities.json`, "utf8")
-  )?.reverse();
+  );
+  // ?.reverse();
 
   const activeIndoorSplits = indoorClimbingActivities.map((activity: any) =>
     activity?.splitSummaries?.[0]?.splitType === "CLIMB_ACTIVE"
@@ -86,7 +87,8 @@ export const parse = async () => {
 
   const boulderingActivities = JSON.parse(
     fs.readFileSync(`${garminDataFolder}/boulderingActivities.json`, "utf8")
-  )?.reverse();
+  );
+  // ?.reverse();
 
   const activeBoulderingSplits = boulderingActivities
     .map((activity: any) =>
@@ -140,7 +142,58 @@ export const parse = async () => {
     (sum: number, feet: number) => sum + feet,
     0
   );
-  console.log(`All Time Total Feet Climbed: ${totalFeet} ft\n`);
+
+  console.log(`All Time Total Feet Climbed: ${totalFeet} ft`);
+  const totalNumberOfRoutes = activeIndoorSplits?.reduce(
+    (acc: any, split: any) => acc + split?.numClimbSends,
+    0
+  );
+  console.log(
+    `All Time Total Number of Routes Climbed: ${totalNumberOfRoutes}`
+  );
+  const totalNumberOfFalls = activeIndoorSplits?.reduce(
+    (acc: any, split: any) => acc + split?.numFalls,
+    0
+  );
+  console.log(`All Time Total Number of Falls: ${totalNumberOfFalls}`);
+
+  const averageGrade = Math.round(
+    activeIndoorSplits?.reduce(
+      (acc: any, split: any) =>
+        acc + YDS_GRADE_MAP?.[split?.maxGradeValue?.valueKey],
+      0
+    ) / activeIndoorSplits?.length
+  );
+  console.log(`All Time Average Max Grade: ${numberToGrade(averageGrade)}`);
+
+  const maxGrade = Math.max(
+    ...activeIndoorSplits?.map(
+      (split: any) => YDS_GRADE_MAP?.[split?.maxGradeValue?.valueKey]
+    )
+  );
+  console.log(`All Time Max Grade: ${numberToGrade(maxGrade)}`);
+
+  const totalBoulders = activeBoulderingSplits?.reduce(
+    (acc: any, split: any) => acc + split?.noOfSplits,
+    0
+  );
+  console.log(`All Time Total Number of Boulders Climbed: ${totalBoulders}`);
+
+  const averageBoulderGrade = Math.round(
+    activeBoulderingSplits?.reduce(
+      (acc: any, split: any) =>
+        acc + parseInt(split?.maxGradeValue?.valueKey?.replace(/\D/g, "")),
+      0
+    ) / activeBoulderingSplits?.length
+  );
+  console.log(`All Time Average Max Boulder Grade: V${averageBoulderGrade}`);
+
+  const maxBoulderGrade = Math.max(
+    ...activeBoulderingSplits?.map((split: any) =>
+      parseInt(split?.maxGradeValue?.valueKey?.replace(/\D/g, ""))
+    )
+  );
+  console.log(`All Time Max Boulder Grade: V${maxBoulderGrade}\n`);
 
   generateChart(
     Object.keys(totalFeetByMonthYear).map((month: string, index) => [

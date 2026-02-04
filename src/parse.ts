@@ -149,7 +149,7 @@ export const parse = async () => {
     0
   );
   console.log(
-    `All Time Total Number of Routes Climbed: ${totalNumberOfRoutes}`
+    `All Time Total Number of Routes Sent Without Falling: ${totalNumberOfRoutes}`
   );
   const totalNumberOfFalls = activeIndoorSplits?.reduce(
     (acc: any, split: any) => acc + split?.numFalls,
@@ -395,7 +395,7 @@ export const parse = async () => {
       index,
       metersToFeet(split?.totalAscent),
     ]),
-    "Total Feet Per Session",
+    "Total Feet Per Session (approximate, garmin doesn't track boulder completion vs attempts with this API)",
     {
       height: 10,
       width: activeIndoorSplits?.length * CHART_WIDTH_PER_DATA_POINT,
@@ -442,7 +442,7 @@ export const parse = async () => {
       index,
       split?.noOfSplits,
     ]),
-    "Number of Climbs per session",
+    "Number of Splits per session (garmin doesn't track boulder completion vs attempts with this API)",
     {
       height: 10,
       barChart: true,

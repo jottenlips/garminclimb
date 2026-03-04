@@ -1,0 +1,230 @@
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  .gc-dashboard .gc-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  .gc-dashboard .gc-stat {
+    background: #e8f0e0;
+    border-radius: 8px;
+    padding: 10px 14px;
+  }
+  .gc-dashboard .gc-stat .label {
+    font-size: 0.7em;
+    color: #4a8525;
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+  }
+  .gc-dashboard .gc-stat .value {
+    font-size: 1.3em;
+    color: #2d5016;
+    font-weight: bold;
+  }
+  .gc-dashboard .gc-chart {
+    background: #fff;
+    border: 1px solid #e0e0d8;
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 16px;
+  }
+  @media (max-width: 600px) {
+    .gc-dashboard .gc-stats { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .gc-dashboard .gc-stat { padding: 8px 10px; }
+    .gc-dashboard .gc-stat .value { font-size: 1.1em; }
+    .gc-dashboard .gc-chart { padding: 8px; margin-bottom: 12px; }
+  }
+</style>
+
+<div class="gc-dashboard">
+  <div class="gc-stats" id="gc-stats-summary"></div>
+
+  <h2>Yearly Overview</h2>
+  <div id="gc-yearly-charts"></div>
+
+  <h2>Monthly Trends</h2>
+  <div id="gc-monthly-charts"></div>
+
+  <h2>Per-Session: Rope Climbing</h2>
+  <div id="gc-session-rope-charts"></div>
+
+  <h2>Per-Session: Bouldering</h2>
+  <div id="gc-session-boulder-charts"></div>
+</div>
+
+<script>
+(function() {
+var COLORS = {
+  green1: '#2d5016', green2: '#3a6b1e', green3: '#4a8525',
+  leaf: '#6b9e3a', sage: '#8fbc6a', olive: '#7a8a40',
+  tan: '#b5956a', brown: '#8a6830', sand: '#c4a060', rust: '#a06030',
+};
+
+var YDS_GRADE_MAP = {
+  _5_6:0,_5_7:1,_5_8:2,_5_9:3,
+  _5_10A:4,_5_10_MINUS:4,_5_10B:5,_5_10:5,_5_10C:6,_5_10_PLUS:7,_5_10D:7,
+  _5_11A:8,_5_11_MINUS:8,_5_11B:9,_5_11:9,_5_11C:10,_5_11_PLUS:11,_5_11D:11,
+  _5_12A:12,_5_12_MINUS:12,_5_12B:13,_5_12:13,_5_12C:14,_5_12_PLUS:15,_5_12D:15,
+  _5_13A:16,_5_13_MINUS:16,_5_13B:17,_5_13:17,_5_13C:18,_5_13_PLUS:19,_5_13D:19,
+  _5_14A:20,_5_14_MINUS:20,_5_14B:21,_5_14:21,_5_14C:22,_5_14_PLUS:23,_5_14D:23,
+};
+
+var GRADE_LABELS = ['5.6','5.7','5.8','5.9','5.10a','5.10b','5.10c','5.10d',
+  '5.11a','5.11b','5.11c','5.11d','5.12a','5.12b','5.12c','5.12d',
+  '5.13a','5.13b','5.13c','5.13d','5.14a','5.14b','5.14c','5.14d'];
+
+function numberToGrade(n) { return GRADE_LABELS[n] || ''+n; }
+function metersToFeet(m) { return Math.round(m * 3.28084); }
+
+function getActiveSplit(activity) {
+  var s = activity && activity.splitSummaries;
+  if (!s || !s.length) return null;
+  var split = s[0] && s[0].splitType === 'CLIMB_ACTIVE' ? s[0] : s[1];
+  return Object.assign({}, split, { start: activity.startTimeLocal });
+}
+
+function makeCanvas(parentId) {
+  var box = document.createElement('div');
+  box.className = 'gc-chart';
+  var canvas = document.createElement('canvas');
+  box.appendChild(canvas);
+  document.getElementById(parentId).appendChild(box);
+  return canvas.getContext('2d');
+}
+
+function barChart(ctx, labels, data, title, color, yCallback) {
+  new Chart(ctx, {
+    type: 'bar',
+    data: { labels: labels, datasets: [{ label: title, data: data, backgroundColor: color + 'bb', borderColor: color, borderWidth: 1, borderRadius: 3 }] },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { display: false }, title: { display: true, text: title, color: '#2d5016', font: { size: 13, weight: '600' } } },
+      scales: { y: { beginAtZero: true, ticks: { callback: yCallback || function(v){return v}, font: { size: 10 } }, grid: { color: '#e8e8e0' } }, x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45 } } }
+    }
+  });
+}
+
+function lineChart(ctx, labels, data, title, color, yCallback, integerOnly) {
+  new Chart(ctx, {
+    type: 'line',
+    data: { labels: labels, datasets: [{ label: title, data: data, borderColor: color, backgroundColor: color + '22', fill: true, tension: 0.3, pointRadius: 3, pointBackgroundColor: color, borderWidth: 2 }] },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { display: false }, title: { display: true, text: title, color: '#2d5016', font: { size: 13, weight: '600' } } },
+      scales: { y: { beginAtZero: false, ticks: { callback: yCallback || function(v){return v}, font: { size: 10 }, stepSize: integerOnly ? 1 : undefined }, grid: { color: '#e8e8e0' } }, x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45 } } }
+    }
+  });
+}
+
+function render(indoorData, boulderData) {
+  Chart.defaults.color = '#555';
+  Chart.defaults.borderColor = '#e0e0d8';
+  Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  Chart.defaults.font.size = 11;
+
+  var indoorSplits = indoorData.map(getActiveSplit).filter(Boolean);
+  var boulderSplits = boulderData.map(getActiveSplit).filter(Boolean).filter(function(s){ return s.noOfSplits !== 1; });
+
+  function groupByMonthYear(splits, valueFn) {
+    var map = {};
+    splits.forEach(function(s) {
+      var parts = s.start.split(' ')[0].split('-');
+      var key = parts[0] + '-' + parts[1];
+      map[key] = valueFn(s, map[key]);
+    });
+    return map;
+  }
+
+  function aggregateByYear(monthly, mode) {
+    var map = {};
+    Object.keys(monthly).forEach(function(key) {
+      var year = key.split('-')[0];
+      if (mode === 'max') map[year] = Math.max(map[year] || 0, monthly[key]);
+      else map[year] = (map[year] || 0) + monthly[key];
+    });
+    var sorted = Object.keys(map).sort(function(a,b){ return parseInt(b)-parseInt(a); });
+    return { labels: sorted, values: sorted.map(function(k){ return map[k]; }) };
+  }
+
+  var feetByMonth = groupByMonthYear(indoorSplits, function(s, prev) { return (prev||0) + metersToFeet(s.totalAscent); });
+  var boulderFeetByMonth = groupByMonthYear(boulderSplits, function(s, prev) { return (prev||0) + s.noOfSplits * 10; });
+  var combinedFeetByMonth = {};
+  Object.keys(feetByMonth).forEach(function(k) { combinedFeetByMonth[k] = feetByMonth[k] + (boulderFeetByMonth[k]||0); });
+  var maxGradeByMonth = groupByMonthYear(indoorSplits, function(s, prev) { return Math.max(prev||0, YDS_GRADE_MAP[s.maxGradeValue && s.maxGradeValue.valueKey]||0); });
+  var maxBoulderGradeByMonth = groupByMonthYear(boulderSplits, function(s, prev) { return Math.max(prev||0, parseInt((s.maxGradeValue && s.maxGradeValue.valueKey||'').replace(/\D/g,''))||0); });
+  var ropeSessionsByMonth = groupByMonthYear(indoorSplits, function(s, prev) { return (prev||0)+1; });
+  var boulderSessionsByMonth = groupByMonthYear(boulderSplits, function(s, prev) { return (prev||0)+1; });
+
+  // Stats
+  var totalFeet = Object.values(combinedFeetByMonth).reduce(function(a,b){return a+b},0);
+  var totalRoutes = indoorSplits.reduce(function(a,s){return a+(s.numClimbSends||0)},0);
+  var totalFalls = indoorSplits.reduce(function(a,s){return a+(s.numFalls||0)},0);
+  var totalBoulders = boulderSplits.reduce(function(a,s){return a+(s.noOfSplits||0)},0);
+  var avgMaxGrade = Math.round(indoorSplits.reduce(function(a,s){return a+(YDS_GRADE_MAP[s.maxGradeValue&&s.maxGradeValue.valueKey]||0)},0)/indoorSplits.length);
+  var bestGrade = Math.max.apply(null, indoorSplits.map(function(s){return YDS_GRADE_MAP[s.maxGradeValue&&s.maxGradeValue.valueKey]||0}));
+  var bestBoulderGrade = Math.max.apply(null, boulderSplits.map(function(s){return parseInt((s.maxGradeValue&&s.maxGradeValue.valueKey||'').replace(/\D/g,''))||0}));
+
+  document.getElementById('gc-stats-summary').innerHTML = [
+    ['Total Feet', totalFeet.toLocaleString()+' ft'], ['Routes Sent', totalRoutes], ['Falls', totalFalls],
+    ['Boulders', totalBoulders], ['Avg Max Grade', numberToGrade(avgMaxGrade)],
+    ['Best Rope', numberToGrade(bestGrade)], ['Best Boulder', 'V'+bestBoulderGrade],
+  ].map(function(pair){ return '<div class="gc-stat"><div class="label">'+pair[0]+'</div><div class="value">'+pair[1]+'</div></div>'; }).join('');
+
+  // Yearly
+  [[combinedFeetByMonth,'sum','Total Feet By Year (Combined)',COLORS.green1],
+   [feetByMonth,'sum','Route Feet By Year',COLORS.green3],
+   [boulderFeetByMonth,'sum','Boulder Feet By Year',COLORS.olive],
+   [ropeSessionsByMonth,'sum','Rope Sessions By Year',COLORS.tan],
+   [boulderSessionsByMonth,'sum','Boulder Sessions By Year',COLORS.brown]
+  ].forEach(function(arr){ var r=aggregateByYear(arr[0],arr[1]); barChart(makeCanvas('gc-yearly-charts'),r.labels,r.values,arr[2],arr[3]); });
+  var yrG=aggregateByYear(maxGradeByMonth,'max');
+  lineChart(makeCanvas('gc-yearly-charts'),yrG.labels,yrG.values,'Max Rope Grade By Year',COLORS.leaf,numberToGrade);
+  var yrB=aggregateByYear(maxBoulderGradeByMonth,'max');
+  lineChart(makeCanvas('gc-yearly-charts'),yrB.labels,yrB.values,'Max Boulder Grade By Year',COLORS.rust,function(v){return 'V'+v},true);
+
+  // Monthly
+  function monthlyEntries(map) { return Object.keys(map).sort(function(a,b){return b.localeCompare(a)}).map(function(k){return [k,map[k]]}); }
+  [[combinedFeetByMonth,'Total Feet By Month (Combined)',COLORS.green1,'bar'],
+   [feetByMonth,'Route Feet By Month',COLORS.green3,'bar'],
+   [boulderFeetByMonth,'Boulder Feet By Month',COLORS.olive,'bar'],
+   [maxGradeByMonth,'Max Rope Grade By Month',COLORS.leaf,'line',numberToGrade],
+   [maxBoulderGradeByMonth,'Max Boulder Grade By Month',COLORS.rust,'line',function(v){return 'V'+v},true],
+   [ropeSessionsByMonth,'Rope Sessions By Month',COLORS.tan,'bar'],
+   [boulderSessionsByMonth,'Boulder Sessions By Month',COLORS.brown,'bar']
+  ].forEach(function(arr){
+    var e=monthlyEntries(arr[0]),l=e.map(function(x){return x[0]}),v=e.map(function(x){return x[1]}),ctx=makeCanvas('gc-monthly-charts');
+    if(arr[3]==='line') lineChart(ctx,l,v,arr[1],arr[2],arr[4],arr[5]);
+    else barChart(ctx,l,v,arr[1],arr[2],arr[4]);
+  });
+
+  // Per-session rope
+  var rL=indoorSplits.map(function(s){return s.start.split(' ')[0]});
+  [[indoorSplits.map(function(s){return YDS_GRADE_MAP[s.maxGradeValue&&s.maxGradeValue.valueKey]||0}),'Max Grade Per Session',COLORS.green2,'line',numberToGrade],
+   [indoorSplits.map(function(s){return s.numClimbSends||0}),'Sends Per Session',COLORS.tan,'bar'],
+   [indoorSplits.map(function(s){return metersToFeet(s.totalAscent||0)}),'Feet Per Session',COLORS.green3,'bar'],
+   [indoorSplits.map(function(s){return Math.round((s.duration||0)/60)}),'Active Minutes Per Session',COLORS.olive,'bar']
+  ].forEach(function(arr){
+    var ctx=makeCanvas('gc-session-rope-charts');
+    if(arr[3]==='line') lineChart(ctx,rL,arr[0],arr[1],arr[2],arr[4]);
+    else barChart(ctx,rL,arr[0],arr[1],arr[2]);
+  });
+
+  // Per-session boulder
+  var bL=boulderSplits.map(function(s){return s.start.split(' ')[0]});
+  [[boulderSplits.map(function(s){return parseInt((s.maxGradeValue&&s.maxGradeValue.valueKey||'').replace(/\D/g,''))||0}),'Max Boulder Grade Per Session',COLORS.rust,'line',function(v){return 'V'+v},true],
+   [boulderSplits.map(function(s){return s.noOfSplits||0}),'Splits Per Session',COLORS.brown,'bar'],
+   [boulderSplits.map(function(s){return Math.round((s.duration||0)/60)}),'Active Minutes Per Session',COLORS.leaf,'bar']
+  ].forEach(function(arr){
+    var ctx=makeCanvas('gc-session-boulder-charts');
+    if(arr[3]==='line') lineChart(ctx,bL,arr[0],arr[1],arr[2],arr[4],arr[5]);
+    else barChart(ctx,bL,arr[0],arr[1],arr[2]);
+  });
+}
+
+if (typeof INDOOR_DATA !== 'undefined' && typeof BOULDER_DATA !== 'undefined') {
+  render(INDOOR_DATA, BOULDER_DATA);
+}
+})();
+</script>

@@ -75,18 +75,21 @@ const numberToGrade = (number: number): string => {
 
 export const parse = async () => {
   const indoorClimbingActivities = JSON.parse(
-    fs.readFileSync(`${garminDataFolder}/indoorClimbingActivities.json`, "utf8")
+    fs.readFileSync(
+      `${garminDataFolder}/indoorClimbingActivities.json`,
+      "utf8",
+    ),
   );
   // ?.reverse();
 
   const activeIndoorSplits = indoorClimbingActivities.map((activity: any) =>
     activity?.splitSummaries?.[0]?.splitType === "CLIMB_ACTIVE"
       ? { ...activity?.splitSummaries?.[0], start: activity?.startTimeLocal }
-      : { ...activity?.splitSummaries?.[1], start: activity?.startTimeLocal }
+      : { ...activity?.splitSummaries?.[1], start: activity?.startTimeLocal },
   );
 
   const boulderingActivities = JSON.parse(
-    fs.readFileSync(`${garminDataFolder}/boulderingActivities.json`, "utf8")
+    fs.readFileSync(`${garminDataFolder}/boulderingActivities.json`, "utf8"),
   );
   // ?.reverse();
 
@@ -94,7 +97,7 @@ export const parse = async () => {
     .map((activity: any) =>
       activity?.splitSummaries?.[0]?.splitType === "CLIMB_ACTIVE"
         ? { ...activity?.splitSummaries?.[0], start: activity?.startTimeLocal }
-        : { ...activity?.splitSummaries?.[1], start: activity?.startTimeLocal }
+        : { ...activity?.splitSummaries?.[1], start: activity?.startTimeLocal },
     )
     .filter((split: any) => split?.noOfSplits !== 1);
 
@@ -124,7 +127,7 @@ export const parse = async () => {
       const month = split?.start?.split(" ")[0].split("-")[1];
       const year = split?.start?.split(" ")[0].split("-")[0];
       acc[`${year}-${month}`] =
-        (acc[`${year}-${month}`] || 0) + split?.noOfSplits * 8;
+        (acc[`${year}-${month}`] || 0) + split?.noOfSplits * 10;
       return acc;
     }, {});
 
@@ -134,26 +137,26 @@ export const parse = async () => {
         totalFeetByMonthYear[key] + (totalFeetByMonthYearBouldering[key] || 0);
       return acc;
     },
-    {}
+    {},
   );
 
   const totalFeet = Object.values(totalFeetByMonthYearCombined).reduce(
     //@ts-ignore
     (sum: number, feet: number) => sum + feet,
-    0
+    0,
   );
 
   console.log(`All Time Total Feet Climbed: ${totalFeet} ft`);
   const totalNumberOfRoutes = activeIndoorSplits?.reduce(
     (acc: any, split: any) => acc + split?.numClimbSends,
-    0
+    0,
   );
   console.log(
-    `All Time Total Number of Routes Sent Without Falling: ${totalNumberOfRoutes}`
+    `All Time Total Number of Routes Sent Without Falling: ${totalNumberOfRoutes}`,
   );
   const totalNumberOfFalls = activeIndoorSplits?.reduce(
     (acc: any, split: any) => acc + split?.numFalls,
-    0
+    0,
   );
   console.log(`All Time Total Number of Falls: ${totalNumberOfFalls}`);
 
@@ -161,21 +164,21 @@ export const parse = async () => {
     activeIndoorSplits?.reduce(
       (acc: any, split: any) =>
         acc + YDS_GRADE_MAP?.[split?.maxGradeValue?.valueKey],
-      0
-    ) / activeIndoorSplits?.length
+      0,
+    ) / activeIndoorSplits?.length,
   );
   console.log(`All Time Average Max Grade: ${numberToGrade(averageGrade)}`);
 
   const maxGrade = Math.max(
     ...activeIndoorSplits?.map(
-      (split: any) => YDS_GRADE_MAP?.[split?.maxGradeValue?.valueKey]
-    )
+      (split: any) => YDS_GRADE_MAP?.[split?.maxGradeValue?.valueKey],
+    ),
   );
   console.log(`All Time Max Grade: ${numberToGrade(maxGrade)}`);
 
   const totalBoulders = activeBoulderingSplits?.reduce(
     (acc: any, split: any) => acc + split?.noOfSplits,
-    0
+    0,
   );
   console.log(`All Time Total Number of Boulders Climbed: ${totalBoulders}`);
 
@@ -183,17 +186,38 @@ export const parse = async () => {
     activeBoulderingSplits?.reduce(
       (acc: any, split: any) =>
         acc + parseInt(split?.maxGradeValue?.valueKey?.replace(/\D/g, "")),
-      0
-    ) / activeBoulderingSplits?.length
+      0,
+    ) / activeBoulderingSplits?.length,
   );
   console.log(`All Time Average Max Boulder Grade: V${averageBoulderGrade}`);
 
   const maxBoulderGrade = Math.max(
     ...activeBoulderingSplits?.map((split: any) =>
-      parseInt(split?.maxGradeValue?.valueKey?.replace(/\D/g, ""))
-    )
+      parseInt(split?.maxGradeValue?.valueKey?.replace(/\D/g, "")),
+    ),
   );
   console.log(`All Time Max Boulder Grade: V${maxBoulderGrade}\n`);
+
+  console.log(
+    "Total Number of Feet this month",
+    totalFeetByMonthYearCombined[Object.keys(totalFeetByMonthYearCombined)[0]],
+    "\n",
+  );
+
+  generateChart(
+    Object.keys(totalFeetByMonthYearCombined).map((month: string, index) => [
+      index,
+      totalFeetByMonthYearCombined[month],
+    ]),
+    "Total Feet By Month Combined",
+    {
+      height: 20,
+      width: YEAR_WIDTH,
+      barChart: true,
+      formatter: (value: number, { axis }: any) =>
+        axis === "y" ? value : Object.keys(totalFeetByMonthYearCombined)[value],
+    },
+  );
 
   generateChart(
     Object.keys(totalFeetByMonthYear).map((month: string, index) => [
@@ -207,7 +231,7 @@ export const parse = async () => {
       barChart: true,
       formatter: (value: number, { axis }: any) =>
         axis === "y" ? value : Object.keys(totalFeetByMonthYear)[value],
-    }
+    },
   );
 
   generateChart(
@@ -224,22 +248,7 @@ export const parse = async () => {
         axis === "y"
           ? value
           : Object.keys(totalFeetByMonthYearBouldering)[value],
-    }
-  );
-
-  generateChart(
-    Object.keys(totalFeetByMonthYearCombined).map((month: string, index) => [
-      index,
-      totalFeetByMonthYearCombined[month],
-    ]),
-    "Total Feet By Month Combined",
-    {
-      height: 10,
-      width: YEAR_WIDTH,
-      barChart: true,
-      formatter: (value: number, { axis }: any) =>
-        axis === "y" ? value : Object.keys(totalFeetByMonthYearCombined)[value],
-    }
+    },
   );
 
   // max rope grade per month
@@ -249,11 +258,11 @@ export const parse = async () => {
       const year = split?.start?.split(" ")[0].split("-")[0];
       acc[`${year}-${month}`] = Math.max(
         acc[`${year}-${month}`] || 0,
-        YDS_GRADE_MAP?.[split?.maxGradeValue?.valueKey]
+        YDS_GRADE_MAP?.[split?.maxGradeValue?.valueKey],
       );
       return acc;
     },
-    {}
+    {},
   );
 
   generateChart(
@@ -269,7 +278,7 @@ export const parse = async () => {
         axis === "y"
           ? `${numberToGrade(value)}`
           : Object.keys(maxGradeByMonthYear)[value],
-    }
+    },
   );
 
   const maxBoulderGradeByMonthYear = activeBoulderingSplits?.reduce(
@@ -278,11 +287,11 @@ export const parse = async () => {
       const year = split?.start?.split(" ")[0].split("-")[0];
       acc[`${year}-${month}`] = Math.max(
         acc[`${year}-${month}`] || 0,
-        parseInt(split?.maxGradeValue?.valueKey?.replace(/\D/g, ""))
+        parseInt(split?.maxGradeValue?.valueKey?.replace(/\D/g, "")),
       );
       return acc;
     },
-    {}
+    {},
   );
 
   generateChart(
@@ -298,7 +307,7 @@ export const parse = async () => {
         axis === "y"
           ? `V${value}`
           : Object.keys(maxBoulderGradeByMonthYear)[value],
-    }
+    },
   );
 
   const numberOfRopeSessionsByMonthYear = activeIndoorSplits?.reduce(
@@ -308,7 +317,7 @@ export const parse = async () => {
       acc[`${year}-${month}`] = (acc[`${year}-${month}`] || 0) + 1;
       return acc;
     },
-    {}
+    {},
   );
 
   generateChart(
@@ -324,7 +333,7 @@ export const parse = async () => {
         axis === "y"
           ? value
           : Object.keys(numberOfRopeSessionsByMonthYear)[value],
-    }
+    },
   );
 
   const numberOfBoulderSessionsByMonthYear = activeBoulderingSplits?.reduce(
@@ -334,7 +343,7 @@ export const parse = async () => {
       acc[`${year}-${month}`] = (acc[`${year}-${month}`] || 0) + 1;
       return acc;
     },
-    {}
+    {},
   );
 
   generateChart(
@@ -342,7 +351,7 @@ export const parse = async () => {
       (month: string, index) => [
         index,
         numberOfBoulderSessionsByMonthYear[month],
-      ]
+      ],
     ),
     "Number of Boulder Sessions By Month",
     {
@@ -352,7 +361,117 @@ export const parse = async () => {
         axis === "y"
           ? value
           : Object.keys(numberOfBoulderSessionsByMonthYear)[value],
-    }
+    },
+  );
+
+  // === YEARLY GRAPHS ===
+  console.log("\n\nYearly Stats ===============================\n");
+
+  const aggregateByYear = (monthlyData: any, mode: "sum" | "max" = "sum"): [string, number][] => {
+    const map: any = {};
+    Object.keys(monthlyData).forEach((key: string) => {
+      const year = key.split("-")[0];
+      if (mode === "max") {
+        map[year] = Math.max(map[year] || 0, monthlyData[key]);
+      } else {
+        map[year] = (map[year] || 0) + monthlyData[key];
+      }
+    });
+    // Sort descending (2026 first) - return array to avoid JS integer key reordering
+    return Object.keys(map)
+      .sort((a, b) => parseInt(b) - parseInt(a))
+      .map(k => [k, map[k]]);
+  };
+
+  const totalFeetByYearCombined = aggregateByYear(totalFeetByMonthYearCombined);
+  generateChart(
+    totalFeetByYearCombined.map(([, val], index) => [index, val]),
+    "Total Feet By Year Combined",
+    {
+      height: 15,
+      width: totalFeetByYearCombined.length * 20,
+      barChart: true,
+      formatter: (value: number, { axis }: any) =>
+        axis === "y" ? value : totalFeetByYearCombined[value]?.[0],
+    },
+  );
+
+  const totalFeetByYear = aggregateByYear(totalFeetByMonthYear);
+  generateChart(
+    totalFeetByYear.map(([, val], index) => [index, val]),
+    "Total Route Feet By Year",
+    {
+      height: 10,
+      width: totalFeetByYear.length * 20,
+      barChart: true,
+      formatter: (value: number, { axis }: any) =>
+        axis === "y" ? value : totalFeetByYear[value]?.[0],
+    },
+  );
+
+  const totalBoulderFeetByYear = aggregateByYear(totalFeetByMonthYearBouldering);
+  generateChart(
+    totalBoulderFeetByYear.map(([, val], index) => [index, val]),
+    "Approx Boulder Feet By Year",
+    {
+      height: 10,
+      width: totalBoulderFeetByYear.length * 20,
+      barChart: true,
+      formatter: (value: number, { axis }: any) =>
+        axis === "y" ? value : totalBoulderFeetByYear[value]?.[0],
+    },
+  );
+
+  const maxGradeByYear = aggregateByYear(maxGradeByMonthYear, "max");
+  generateChart(
+    maxGradeByYear.map(([, val], index) => [index, val]),
+    "Max Rope Grade By Year",
+    {
+      width: maxGradeByYear.length * 20,
+      formatter: (value: number, { axis }: any) =>
+        axis === "y"
+          ? `${numberToGrade(value)}`
+          : maxGradeByYear[value]?.[0],
+    },
+  );
+
+  const maxBoulderGradeByYear = aggregateByYear(maxBoulderGradeByMonthYear, "max");
+  generateChart(
+    maxBoulderGradeByYear.map(([, val], index) => [index, val]),
+    "Max Boulder Grade By Year",
+    {
+      width: maxBoulderGradeByYear.length * 20,
+      formatter: (value: number, { axis }: any) =>
+        axis === "y"
+          ? `V${value}`
+          : maxBoulderGradeByYear[value]?.[0],
+    },
+  );
+
+  const ropeSessionsByYear = aggregateByYear(numberOfRopeSessionsByMonthYear);
+  generateChart(
+    ropeSessionsByYear.map(([, val], index) => [index, val]),
+    "Number of Rope Sessions By Year",
+    {
+      height: 10,
+      width: ropeSessionsByYear.length * 20,
+      barChart: true,
+      formatter: (value: number, { axis }: any) =>
+        axis === "y" ? value : ropeSessionsByYear[value]?.[0],
+    },
+  );
+
+  const boulderSessionsByYear = aggregateByYear(numberOfBoulderSessionsByMonthYear);
+  generateChart(
+    boulderSessionsByYear.map(([, val], index) => [index, val]),
+    "Number of Boulder Sessions By Year",
+    {
+      height: 10,
+      width: boulderSessionsByYear.length * 20,
+      barChart: true,
+      formatter: (value: number, { axis }: any) =>
+        axis === "y" ? value : boulderSessionsByYear[value]?.[0],
+    },
   );
 
   console.log("```");
@@ -373,7 +492,7 @@ export const parse = async () => {
         axis === "y"
           ? `${numberToGrade(value)}`
           : activeIndoorSplits[value]?.start?.split(" ")[0],
-    }
+    },
   );
 
   generateChart(
@@ -387,7 +506,7 @@ export const parse = async () => {
       width: activeIndoorSplits?.length * CHART_WIDTH_PER_DATA_POINT,
       formatter: (value: number, { axis }: any) =>
         axis === "y" ? value : activeIndoorSplits[value]?.start?.split(" ")[0],
-    }
+    },
   );
 
   generateChart(
@@ -402,7 +521,7 @@ export const parse = async () => {
       barChart: true,
       formatter: (value: number, { axis }: any) =>
         axis === "y" ? value : activeIndoorSplits[value]?.start?.split(" ")[0],
-    }
+    },
   );
 
   generateChart(
@@ -417,7 +536,7 @@ export const parse = async () => {
       width: activeIndoorSplits?.length * CHART_WIDTH_PER_DATA_POINT,
       formatter: (value: number, { axis }: any) =>
         axis === "y" ? value : activeIndoorSplits[value]?.start?.split(" ")[0],
-    }
+    },
   );
 
   console.log("\n\nBouldering===============================");
@@ -434,7 +553,7 @@ export const parse = async () => {
         axis === "y"
           ? `V${value}`
           : activeBoulderingSplits[value]?.start?.split(" ")[0],
-    }
+    },
   );
 
   generateChart(
@@ -451,7 +570,7 @@ export const parse = async () => {
         axis === "y"
           ? value
           : activeBoulderingSplits[value]?.start?.split(" ")[0],
-    }
+    },
   );
 
   generateChart(
@@ -468,7 +587,7 @@ export const parse = async () => {
         axis === "y"
           ? value
           : activeBoulderingSplits[value]?.start?.split(" ")[0],
-    }
+    },
   );
 
   console.log("```");

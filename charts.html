@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Climbing Stats</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #fafaf8;
+    }
+    h1 { color: #2d5016; margin-bottom: 16px; }
+    h2 { color: #3a6b1e; margin: 24px 0 12px; }
+    h3 { color: #4a8525; margin: 20px 0 8px; }
+    a { color: #2d5016; }
+    hr { border: none; border-top: 2px solid #2d5016; margin: 24px 0; }
+
+    .stats-summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: #e8f0e0;
+      border-radius: 8px;
+      padding: 10px 14px;
+    }
+    .stat-card .label {
+      font-size: 0.7em;
+      color: #4a8525;
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+    }
+    .stat-card .value {
+      font-size: 1.3em;
+      color: #2d5016;
+      font-weight: bold;
+    }
+
+    .chart-box {
+      background: #fff;
+      border: 1px solid #e0e0d8;
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 16px;
+    }
+
+    #load-prompt {
+      text-align: center;
+      margin: 40px 0;
+      display: none;
+    }
+    #load-prompt p { color: #666; margin-bottom: 12px; }
+    #load-prompt button {
+      background: #2d5016;
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 1em;
+      font-weight: 600;
+    }
+    #load-prompt button:hover { background: #3a6b1e; }
+
+    @media (max-width: 600px) {
+      body { padding: 12px; }
+      .stats-summary { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+      .stat-card { padding: 8px 10px; }
+      .stat-card .value { font-size: 1.1em; }
+      .chart-box { padding: 8px; margin-bottom: 12px; }
+      h1 { font-size: 1.4em; }
+      h2 { font-size: 1.15em; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Climbing Stats</h1>
+  <div class="stats-summary" id="stats-summary"></div>
+
+  <hr>
+  <h2>Yearly Overview</h2>
+  <div id="yearly-charts"></div>
+
+  <hr>
+  <h2>Monthly Trends</h2>
+  <div id="monthly-charts"></div>
+
+  <hr>
+  <h2>Per-Session: Rope Climbing</h2>
+  <div id="session-rope-charts"></div>
+
+  <hr>
+  <h2>Per-Session: Bouldering</h2>
+  <div id="session-boulder-charts"></div>
+
+  <input type="file" id="fileInput" multiple accept=".json" style="display:none">
+  <div id="load-prompt">
+    <p>Load your Garmin data files (indoorClimbingActivities.json & boulderingActivities.json)</p>
+    <button onclick="document.getElementById('fileInput').click()">Select Files</button>
+  </div>
+
+<script>
+const COLORS = {
+  green1: '#2d5016',
+  green2: '#3a6b1e',
+  green3: '#4a8525',
+  leaf: '#6b9e3a',
+  sage: '#8fbc6a',
+  olive: '#7a8a40',
+  tan: '#b5956a',
+  brown: '#8a6830',
+  sand: '#c4a060',
+  rust: '#a06030',
+};
+
+const YDS_GRADE_MAP = {
+  _5_6:0,_5_7:1,_5_8:2,_5_9:3,
+  _5_10A:4,_5_10_MINUS:4,_5_10B:5,_5_10:5,_5_10C:6,_5_10_PLUS:7,_5_10D:7,
+  _5_11A:8,_5_11_MINUS:8,_5_11B:9,_5_11:9,_5_11C:10,_5_11_PLUS:11,_5_11D:11,
+  _5_12A:12,_5_12_MINUS:12,_5_12B:13,_5_12:13,_5_12C:14,_5_12_PLUS:15,_5_12D:15,
+  _5_13A:16,_5_13_MINUS:16,_5_13B:17,_5_13:17,_5_13C:18,_5_13_PLUS:19,_5_13D:19,
+  _5_14A:20,_5_14_MINUS:20,_5_14B:21,_5_14:21,_5_14C:22,_5_14_PLUS:23,_5_14D:23,
+};
+
+const GRADE_LABELS = ['5.6','5.7','5.8','5.9','5.10a','5.10b','5.10c','5.10d',
+  '5.11a','5.11b','5.11c','5.11d','5.12a','5.12b','5.12c','5.12d',
+  '5.13a','5.13b','5.13c','5.13d','5.14a','5.14b','5.14c','5.14d'];
+
+function numberToGrade(n) { return GRADE_LABELS[n] || `${n}`; }
+function metersToFeet(m) { return Math.round(m * 3.28084); }
+
+function getActiveSplit(activity) {
+  const s = activity?.splitSummaries;
+  if (!s || !s.length) return null;
+  return s[0]?.splitType === 'CLIMB_ACTIVE' ? {...s[0], start: activity.startTimeLocal} : {...s[1], start: activity.startTimeLocal};
+}
+
+function chartDefaults() {
+  Chart.defaults.color = '#555';
+  Chart.defaults.borderColor = '#e0e0d8';
+  Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  Chart.defaults.font.size = 11;
+}
+
+function makeCanvas(parentId) {
+  const box = document.createElement('div');
+  box.className = 'chart-box';
+  const canvas = document.createElement('canvas');
+  box.appendChild(canvas);
+  document.getElementById(parentId).appendChild(box);
+  return canvas.getContext('2d');
+}
+
+function barChart(ctx, labels, data, title, color, yCallback) {
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: title,
+        data,
+        backgroundColor: color + 'bb',
+        borderColor: color,
+        borderWidth: 1,
+        borderRadius: 3,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: { display: false },
+        title: { display: true, text: title, color: '#2d5016', font: { size: 13, weight: '600' } }
+      },
+      scales: {
+        y: { beginAtZero: true, ticks: { callback: yCallback || (v => v), font: { size: 10 } }, grid: { color: '#e8e8e0' } },
+        x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45 } }
+      }
+    }
+  });
+}
+
+function lineChart(ctx, labels, data, title, color, yCallback, integerOnly) {
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: title,
+        data,
+        borderColor: color,
+        backgroundColor: color + '22',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 3,
+        pointBackgroundColor: color,
+        borderWidth: 2,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: { display: false },
+        title: { display: true, text: title, color: '#2d5016', font: { size: 13, weight: '600' } }
+      },
+      scales: {
+        y: { beginAtZero: false, ticks: { callback: yCallback || (v => v), font: { size: 10 }, stepSize: integerOnly ? 1 : undefined }, grid: { color: '#e8e8e0' } },
+        x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45 } }
+      }
+    }
+  });
+}
+
+function processAndRender(indoorData, boulderData) {
+  chartDefaults();
+
+  const indoorSplits = indoorData.map(getActiveSplit).filter(Boolean);
+  const boulderSplits = boulderData.map(getActiveSplit).filter(Boolean).filter(s => s.noOfSplits !== 1);
+
+  function groupByMonthYear(splits, valueFn) {
+    const map = {};
+    splits.forEach(s => {
+      const [date] = s.start.split(' ');
+      const [y, m] = date.split('-');
+      const key = `${y}-${m}`;
+      map[key] = valueFn(s, map[key]);
+    });
+    return map;
+  }
+
+  function aggregateByYear(monthly, mode) {
+    const map = {};
+    Object.entries(monthly).forEach(([key, val]) => {
+      const year = key.split('-')[0];
+      if (mode === 'max') map[year] = Math.max(map[year] || 0, val);
+      else map[year] = (map[year] || 0) + val;
+    });
+    const sorted = Object.entries(map).sort((a, b) => parseInt(b[0]) - parseInt(a[0]));
+    return { labels: sorted.map(e => e[0]), values: sorted.map(e => e[1]) };
+  }
+
+  const feetByMonth = groupByMonthYear(indoorSplits, (s, prev) => (prev || 0) + metersToFeet(s.totalAscent));
+  const boulderFeetByMonth = groupByMonthYear(boulderSplits, (s, prev) => (prev || 0) + s.noOfSplits * 10);
+  const combinedFeetByMonth = {};
+  Object.keys(feetByMonth).forEach(k => combinedFeetByMonth[k] = feetByMonth[k] + (boulderFeetByMonth[k] || 0));
+  const maxGradeByMonth = groupByMonthYear(indoorSplits, (s, prev) => Math.max(prev || 0, YDS_GRADE_MAP[s.maxGradeValue?.valueKey] || 0));
+  const maxBoulderGradeByMonth = groupByMonthYear(boulderSplits, (s, prev) => Math.max(prev || 0, parseInt(s.maxGradeValue?.valueKey?.replace(/\D/g, '')) || 0));
+  const ropeSessionsByMonth = groupByMonthYear(indoorSplits, (s, prev) => (prev || 0) + 1);
+  const boulderSessionsByMonth = groupByMonthYear(boulderSplits, (s, prev) => (prev || 0) + 1);
+
+  // Stats summary
+  const totalFeet = Object.values(combinedFeetByMonth).reduce((a, b) => a + b, 0);
+  const totalRoutes = indoorSplits.reduce((a, s) => a + (s.numClimbSends || 0), 0);
+  const totalFalls = indoorSplits.reduce((a, s) => a + (s.numFalls || 0), 0);
+  const totalBoulders = boulderSplits.reduce((a, s) => a + (s.noOfSplits || 0), 0);
+  const avgMaxGrade = Math.round(indoorSplits.reduce((a, s) => a + (YDS_GRADE_MAP[s.maxGradeValue?.valueKey] || 0), 0) / indoorSplits.length);
+  const bestGrade = Math.max(...indoorSplits.map(s => YDS_GRADE_MAP[s.maxGradeValue?.valueKey] || 0));
+  const bestBoulderGrade = Math.max(...boulderSplits.map(s => parseInt(s.maxGradeValue?.valueKey?.replace(/\D/g, '')) || 0));
+
+  document.getElementById('stats-summary').innerHTML = [
+    ['Total Feet', `${totalFeet.toLocaleString()} ft`],
+    ['Routes Sent', totalRoutes],
+    ['Falls', totalFalls],
+    ['Boulders', totalBoulders],
+    ['Avg Max Grade', numberToGrade(avgMaxGrade)],
+    ['Best Rope', numberToGrade(bestGrade)],
+    ['Best Boulder', `V${bestBoulderGrade}`],
+  ].map(([l, v]) => `<div class="stat-card"><div class="label">${l}</div><div class="value">${v}</div></div>`).join('');
+
+  // Yearly
+  const yearlyBar = [
+    [combinedFeetByMonth, 'sum', 'Total Feet By Year (Combined)', COLORS.green1],
+    [feetByMonth, 'sum', 'Route Feet By Year', COLORS.green3],
+    [boulderFeetByMonth, 'sum', 'Boulder Feet By Year', COLORS.olive],
+    [ropeSessionsByMonth, 'sum', 'Rope Sessions By Year', COLORS.tan],
+    [boulderSessionsByMonth, 'sum', 'Boulder Sessions By Year', COLORS.brown],
+  ];
+  yearlyBar.forEach(([monthly, mode, title, color]) => {
+    const { labels, values } = aggregateByYear(monthly, mode);
+    barChart(makeCanvas('yearly-charts'), labels, values, title, color);
+  });
+  const yrGrade = aggregateByYear(maxGradeByMonth, 'max');
+  lineChart(makeCanvas('yearly-charts'), yrGrade.labels, yrGrade.values, 'Max Rope Grade By Year', COLORS.leaf, v => numberToGrade(v));
+  const yrBoulder = aggregateByYear(maxBoulderGradeByMonth, 'max');
+  lineChart(makeCanvas('yearly-charts'), yrBoulder.labels, yrBoulder.values, 'Max Boulder Grade By Year', COLORS.rust, v => `V${v}`, true);
+
+  // Monthly
+  function monthlyEntries(map) {
+    return Object.entries(map).sort((a, b) => b[0].localeCompare(a[0]));
+  }
+  [
+    [combinedFeetByMonth, 'Total Feet By Month (Combined)', COLORS.green1, 'bar'],
+    [feetByMonth, 'Route Feet By Month', COLORS.green3, 'bar'],
+    [boulderFeetByMonth, 'Boulder Feet By Month', COLORS.olive, 'bar'],
+    [maxGradeByMonth, 'Max Rope Grade By Month', COLORS.leaf, 'line', v => numberToGrade(v)],
+    [maxBoulderGradeByMonth, 'Max Boulder Grade By Month', COLORS.rust, 'line', v => `V${v}`, true],
+    [ropeSessionsByMonth, 'Rope Sessions By Month', COLORS.tan, 'bar'],
+    [boulderSessionsByMonth, 'Boulder Sessions By Month', COLORS.brown, 'bar'],
+  ].forEach(([map, title, color, type, yCb, intOnly]) => {
+    const entries = monthlyEntries(map);
+    const ctx = makeCanvas('monthly-charts');
+    if (type === 'line') lineChart(ctx, entries.map(e => e[0]), entries.map(e => e[1]), title, color, yCb, intOnly);
+    else barChart(ctx, entries.map(e => e[0]), entries.map(e => e[1]), title, color, yCb);
+  });
+
+  // Per-session rope
+  const ropeLabels = indoorSplits.map(s => s.start.split(' ')[0]);
+  [
+    [indoorSplits.map(s => YDS_GRADE_MAP[s.maxGradeValue?.valueKey] || 0), 'Max Grade Per Session', COLORS.green2, 'line', v => numberToGrade(v)],
+    [indoorSplits.map(s => s.numClimbSends || 0), 'Sends Per Session', COLORS.tan, 'bar'],
+    [indoorSplits.map(s => metersToFeet(s.totalAscent || 0)), 'Feet Per Session', COLORS.green3, 'bar'],
+    [indoorSplits.map(s => Math.round((s.duration || 0) / 60)), 'Active Minutes Per Session', COLORS.olive, 'bar'],
+  ].forEach(([data, title, color, type, yCb]) => {
+    const ctx = makeCanvas('session-rope-charts');
+    if (type === 'line') lineChart(ctx, ropeLabels, data, title, color, yCb);
+    else barChart(ctx, ropeLabels, data, title, color, yCb);
+  });
+
+  // Per-session boulder
+  const boulderLabels = boulderSplits.map(s => s.start.split(' ')[0]);
+  [
+    [boulderSplits.map(s => parseInt(s.maxGradeValue?.valueKey?.replace(/\D/g, '')) || 0), 'Max Boulder Grade Per Session', COLORS.rust, 'line', v => `V${v}`, true],
+    [boulderSplits.map(s => s.noOfSplits || 0), 'Splits Per Session', COLORS.brown, 'bar'],
+    [boulderSplits.map(s => Math.round((s.duration || 0) / 60)), 'Active Minutes Per Session', COLORS.leaf, 'bar'],
+  ].forEach(([data, title, color, type, yCb, intOnly]) => {
+    const ctx = makeCanvas('session-boulder-charts');
+    if (type === 'line') lineChart(ctx, boulderLabels, data, title, color, yCb, intOnly);
+    else barChart(ctx, boulderLabels, data, title, color, yCb);
+  });
+
+  document.getElementById('load-prompt').style.display = 'none';
+}
+
+// Data loading
+async function tryLoadFromPath() {
+  try {
+    const [a, b] = await Promise.all([fetch('indoor_climbing.json'), fetch('bouldering.json')]);
+    if (a.ok && b.ok) { processAndRender(await a.json(), await b.json()); return true; }
+  } catch(e) {}
+  return false;
+}
+
+document.getElementById('fileInput').addEventListener('change', async (e) => {
+  const files = Array.from(e.target.files);
+  const indoor = files.find(f => f.name.toLowerCase().includes('indoor'));
+  const boulder = files.find(f => f.name.toLowerCase().includes('boulder'));
+  if (indoor && boulder) {
+    processAndRender(await indoor.text().then(JSON.parse), await boulder.text().then(JSON.parse));
+  } else {
+    alert('Please select both indoorClimbingActivities.json and boulderingActivities.json');
+  }
+});
+
+(async () => {
+  if (typeof INDOOR_DATA !== 'undefined' && typeof BOULDER_DATA !== 'undefined') {
+    processAndRender(INDOOR_DATA, BOULDER_DATA);
+  } else if (!(await tryLoadFromPath())) {
+    document.getElementById('load-prompt').style.display = 'block';
+  }
+})();
+</script>
+</body>
+</html>

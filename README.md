@@ -17,6 +17,48 @@ cd ~/.gc_data
 ls
 ```
 
+# Interactive Chart.js Dashboard
+
+Generate a self-contained HTML file with interactive Chart.js graphs. The HTML includes your climbing data inline so it can be opened in any browser without a server.
+
+```shell
+garminclimb chartjs > climbing_dashboard.html
+open climbing_dashboard.html
+```
+
+This outputs a single HTML file with all your data embedded. Charts include:
+
+- Yearly and monthly totals for feet climbed (rope, boulder, combined)
+- Yearly and monthly max grades (rope and boulder)
+- Yearly and monthly session counts
+- Per-session stats: max grade, sends, feet, active minutes
+- Per-session bouldering: max grade, splits, active minutes
+
+## Embed in a Markdown File
+
+Output an HTML snippet you can paste directly into any markdown file that supports inline HTML (GitHub Pages, Jekyll, static site generators, etc.):
+
+```shell
+garminclimb chartjs-embed > climbing-charts.html
+```
+
+Then include it in your markdown:
+
+```markdown
+# My Climbing Stats
+
+Here are my climbing charts from Garmin:
+
+{% include climbing-charts.html %}
+```
+
+Or paste the output directly into your `.md` file — the snippet includes scoped CSS (`.gc-dashboard` prefix) so it won't conflict with your site's styles.
+
+```shell
+# Append charts to an existing markdown file
+garminclimb chartjs-embed >> climbing.md
+```
+
 # Develop locally or make your own charts
 
 ```shell

@@ -30,6 +30,24 @@
     padding: 14px;
     margin-bottom: 16px;
   }
+  .gc-dashboard details { margin-bottom: 8px; }
+  .gc-dashboard details summary {
+    cursor: pointer;
+    list-style: none;
+    padding: 4px 0;
+  }
+  .gc-dashboard details summary::-webkit-details-marker { display: none; }
+  .gc-dashboard details summary::before {
+    content: '▶ ';
+    font-size: 0.7em;
+    color: #4a8525;
+    transition: transform 0.2s;
+    display: inline-block;
+  }
+  .gc-dashboard details[open] summary::before {
+    content: '▼ ';
+  }
+  .gc-dashboard details summary h2, .gc-dashboard details summary h1 { display: inline; }
   @media (max-width: 600px) {
     .gc-dashboard .gc-stats { grid-template-columns: repeat(2, 1fr); gap: 8px; }
     .gc-dashboard .gc-stat { padding: 8px 10px; }
@@ -41,17 +59,78 @@
 <div class="gc-dashboard">
   <div class="gc-stats" id="gc-stats-summary"></div>
 
-  <h2>Yearly Overview</h2>
+  <details open><summary><h2>Yearly Overview</h2></summary>
   <div id="gc-yearly-charts"></div>
+  </details>
 
-  <h2>Monthly Trends</h2>
+  <details open><summary><h2>Monthly Trends</h2></summary>
   <div id="gc-monthly-charts"></div>
+  </details>
 
-  <h2>Per-Session: Rope Climbing</h2>
+  <details open><summary><h2>Per-Session: Rope Climbing</h2></summary>
   <div id="gc-session-rope-charts"></div>
+  </details>
 
-  <h2>Per-Session: Bouldering</h2>
+  <details open><summary><h2>Per-Session: Bouldering</h2></summary>
   <div id="gc-session-boulder-charts"></div>
+  </details>
+
+  <h1>Strength Training</h1>
+  <div class="gc-stats" id="gc-strength-stats-summary"></div>
+
+  <details open><summary><h2>Yearly Overview: Strength</h2></summary>
+  <div id="gc-strength-yearly-charts"></div>
+  </details>
+
+  <details open><summary><h2>Monthly Trends: Strength</h2></summary>
+  <div id="gc-strength-monthly-charts"></div>
+  </details>
+
+  <details open><summary><h2>Per-Session: Bench Press</h2></summary>
+  <div id="gc-session-bench-charts"></div>
+  </details>
+
+  <details open><summary><h2>Per-Session: Back Squat</h2></summary>
+  <div id="gc-session-squat-charts"></div>
+  </details>
+
+  <details open><summary><h2>Per-Session: Weighted Pull-Up</h2></summary>
+  <div id="gc-session-pullup-charts"></div>
+  </details>
+
+  <details open><summary><h2>Per-Session: Romanian Deadlift</h2></summary>
+  <div id="gc-session-rdl-charts"></div>
+  </details>
+
+  <h1>Cycling</h1>
+  <div class="gc-stats" id="gc-cycling-stats-summary"></div>
+
+  <details open><summary><h2>Yearly Overview: Cycling</h2></summary>
+  <div id="gc-cycling-yearly-charts"></div>
+  </details>
+
+  <details open><summary><h2>Monthly Trends: Cycling</h2></summary>
+  <div id="gc-cycling-monthly-charts"></div>
+  </details>
+
+  <details open><summary><h2>Per-Session: Cycling</h2></summary>
+  <div id="gc-cycling-session-charts"></div>
+  </details>
+
+  <h1>Running</h1>
+  <div class="gc-stats" id="gc-running-stats-summary"></div>
+
+  <details open><summary><h2>Yearly Overview: Running</h2></summary>
+  <div id="gc-running-yearly-charts"></div>
+  </details>
+
+  <details open><summary><h2>Monthly Trends: Running</h2></summary>
+  <div id="gc-running-monthly-charts"></div>
+  </details>
+
+  <details open><summary><h2>Per-Session: Running</h2></summary>
+  <div id="gc-running-session-charts"></div>
+  </details>
 </div>
 
 <script>
@@ -223,8 +302,174 @@ function render(indoorData, boulderData) {
   });
 }
 
+function mgToLbs(mg) { return Math.round((mg / 1000) * 2.20462); }
+
+function extractExerciseSessions(activities, matchFn) {
+  var sessions = [];
+  activities.forEach(function(activity) {
+    var date = activity.startTimeLocal ? activity.startTimeLocal.split(' ')[0] : '';
+    var exercises = activity.exerciseSets || activity.fullSummarizedExerciseSets || activity.summarizedExerciseSets || [];
+    exercises.forEach(function(ex) {
+      var cat = (ex.category || '').toUpperCase();
+      var sub = (ex.subCategory || '').toUpperCase();
+      if (matchFn(cat, sub)) {
+        sessions.push({ date: date, maxWeight: mgToLbs(ex.maxWeight || 0), totalVolume: mgToLbs(ex.volume || 0), sets: ex.sets || 0, totalReps: ex.reps || 0 });
+      }
+    });
+  });
+  return sessions;
+}
+
+function renderStrength(strengthData) {
+  var exercises = {
+    bench: { label: 'Bench Press', containerId: 'gc-session-bench-charts', color: COLORS.green1, match: function(cat, sub) { return cat === 'BENCH_PRESS'; } },
+    squat: { label: 'Back Squat', containerId: 'gc-session-squat-charts', color: COLORS.brown, match: function(cat, sub) { return cat === 'SQUAT' && sub.indexOf('BACK_SQUAT') >= 0; } },
+    pullup: { label: 'Weighted Pull-Up', containerId: 'gc-session-pullup-charts', color: COLORS.rust, match: function(cat, sub) { return cat === 'PULL_UP'; } },
+    rdl: { label: 'Romanian Deadlift', containerId: 'gc-session-rdl-charts', color: COLORS.olive, match: function(cat, sub) { return cat === 'DEADLIFT' && sub.indexOf('ROMANIAN') >= 0; } }
+  };
+
+  var allSessions = {};
+  var statCards = [];
+
+  Object.keys(exercises).forEach(function(key) {
+    var ex = exercises[key];
+    var sessions = extractExerciseSessions(strengthData, ex.match);
+    allSessions[key] = sessions;
+    if (sessions.length > 0) {
+      var bestWeight = Math.max.apply(null, sessions.map(function(s){return s.maxWeight}));
+      var avgWeight = Math.round(sessions.reduce(function(a,s){return a+s.maxWeight},0) / sessions.length);
+      statCards.push([ex.label + ' Max', bestWeight + ' lbs']);
+      statCards.push([ex.label + ' Avg', avgWeight + ' lbs']);
+    }
+  });
+
+  statCards.push(['Strength Sessions', strengthData.length]);
+  document.getElementById('gc-strength-stats-summary').innerHTML = statCards.map(function(pair) {
+    return '<div class="gc-stat"><div class="label">'+pair[0]+'</div><div class="value">'+pair[1]+'</div></div>';
+  }).join('');
+
+  Object.keys(exercises).forEach(function(key) {
+    var ex = exercises[key];
+    var sessions = allSessions[key];
+    if (sessions.length === 0) return;
+
+    function groupByMonth(sessions, valueFn) {
+      var map = {};
+      sessions.forEach(function(s) {
+        var parts = s.date.split('-');
+        var k = parts[0] + '-' + parts[1];
+        map[k] = valueFn(s, map[k]);
+      });
+      return map;
+    }
+
+    var maxWeightByMonth = groupByMonth(sessions, function(s, prev) { return Math.max(prev || 0, s.maxWeight); });
+    var volumeByMonth = groupByMonth(sessions, function(s, prev) { return (prev || 0) + s.totalVolume; });
+    var repsByMonth = groupByMonth(sessions, function(s, prev) { return (prev || 0) + s.totalReps; });
+    var sessionsByMonth = groupByMonth(sessions, function(s, prev) { return (prev || 0) + 1; });
+
+    function aggByYear(monthly, mode) {
+      var map = {};
+      Object.keys(monthly).forEach(function(key) {
+        var year = key.split('-')[0];
+        if (mode === 'max') map[year] = Math.max(map[year] || 0, monthly[key]);
+        else map[year] = (map[year] || 0) + monthly[key];
+      });
+      var sorted = Object.keys(map).sort(function(a,b){return parseInt(b)-parseInt(a)});
+      return { labels: sorted, values: sorted.map(function(k){return map[k]}) };
+    }
+
+    function monthlyEntries(map) { return Object.keys(map).sort(function(a,b){return b.localeCompare(a)}).map(function(k){return [k,map[k]]}); }
+
+    // Yearly
+    var yrWeight = aggByYear(maxWeightByMonth, 'max');
+    lineChart(makeCanvas('gc-strength-yearly-charts'), yrWeight.labels, yrWeight.values, ex.label + ' Max Weight By Year (lbs)', ex.color);
+    var yrVolume = aggByYear(volumeByMonth, 'sum');
+    barChart(makeCanvas('gc-strength-yearly-charts'), yrVolume.labels, yrVolume.values, ex.label + ' Volume By Year (lbs)', ex.color);
+    var yrReps = aggByYear(repsByMonth, 'sum');
+    barChart(makeCanvas('gc-strength-yearly-charts'), yrReps.labels, yrReps.values, ex.label + ' Total Reps By Year', ex.color);
+
+    // Monthly
+    var mWeight = monthlyEntries(maxWeightByMonth);
+    lineChart(makeCanvas('gc-strength-monthly-charts'), mWeight.map(function(e){return e[0]}), mWeight.map(function(e){return e[1]}), ex.label + ' Max Weight By Month (lbs)', ex.color);
+    var mVolume = monthlyEntries(volumeByMonth);
+    barChart(makeCanvas('gc-strength-monthly-charts'), mVolume.map(function(e){return e[0]}), mVolume.map(function(e){return e[1]}), ex.label + ' Volume By Month (lbs)', ex.color);
+    var mReps = monthlyEntries(repsByMonth);
+    barChart(makeCanvas('gc-strength-monthly-charts'), mReps.map(function(e){return e[0]}), mReps.map(function(e){return e[1]}), ex.label + ' Reps By Month', ex.color);
+    var mSessions = monthlyEntries(sessionsByMonth);
+    barChart(makeCanvas('gc-strength-monthly-charts'), mSessions.map(function(e){return e[0]}), mSessions.map(function(e){return e[1]}), ex.label + ' Sessions By Month', ex.color);
+
+    // Per-session
+    var labels = sessions.map(function(s){return s.date});
+    lineChart(makeCanvas(ex.containerId), labels, sessions.map(function(s){return s.maxWeight}), 'Max Weight Per Session (lbs)', ex.color);
+    barChart(makeCanvas(ex.containerId), labels, sessions.map(function(s){return s.totalVolume}), 'Volume Per Session (lbs)', ex.color);
+    barChart(makeCanvas(ex.containerId), labels, sessions.map(function(s){return s.totalReps}), 'Reps Per Session', ex.color);
+    barChart(makeCanvas(ex.containerId), labels, sessions.map(function(s){return s.sets}), 'Sets Per Session', ex.color);
+  });
+}
+
+function renderCardio(activities, sport) {
+  var prefix = 'gc-' + sport.toLowerCase();
+  var sessions = activities.map(function(a) {
+    var dist = Math.round(((a.distance||0) / 1609.344) * 100) / 100;
+    var dur = Math.round((a.duration||0) / 60);
+    var miles = (a.distance||0) / 1609.344;
+    var pace = miles > 0 ? Math.round(((a.duration||0)/60)/miles*100)/100 : 0;
+    return { date: a.startTimeLocal ? a.startTimeLocal.split(' ')[0] : '', distance: dist, duration: dur, pace: pace, calories: a.calories||0, avgHR: a.averageHR||0, elevGain: Math.round((a.elevationGain||0)*3.28084) };
+  });
+
+  var totalDist = Math.round(sessions.reduce(function(a,s){return a+s.distance},0)*100)/100;
+  var totalTime = sessions.reduce(function(a,s){return a+s.duration},0);
+  var paced = sessions.filter(function(s){return s.pace>0});
+  var avgPace = paced.length ? Math.round(paced.reduce(function(a,s){return a+s.pace},0)/paced.length*100)/100 : 0;
+  var bestPace = paced.length ? Math.round(Math.min.apply(null,paced.map(function(s){return s.pace}))*100)/100 : 0;
+  var totalCal = sessions.reduce(function(a,s){return a+s.calories},0);
+  var totalElev = sessions.reduce(function(a,s){return a+s.elevGain},0);
+
+  document.getElementById(prefix+'-stats-summary').innerHTML = [
+    ['Total Distance',totalDist+' mi'],['Total Time',Math.round(totalTime/60)+' hrs'],
+    ['Avg Pace',avgPace+' min/mi'],['Best Pace',bestPace+' min/mi'],
+    ['Calories',totalCal.toLocaleString()],['Elev Gain',totalElev.toLocaleString()+' ft'],['Sessions',sessions.length]
+  ].map(function(p){return '<div class="gc-stat"><div class="label">'+p[0]+'</div><div class="value">'+p[1]+'</div></div>'}).join('');
+
+  function grpMonth(sessions, fn) { var m={}; sessions.forEach(function(s){ var p=s.date.split('-'); var k=p[0]+'-'+p[1]; m[k]=fn(s,m[k]); }); return m; }
+  function aggYear(monthly, mode) { var m={}; Object.keys(monthly).forEach(function(k){ var y=k.split('-')[0]; if(mode==='max') m[y]=Math.max(m[y]||0,monthly[k]); else m[y]=(m[y]||0)+monthly[k]; }); var s=Object.keys(m).sort(function(a,b){return parseInt(b)-parseInt(a)}); return {labels:s,values:s.map(function(k){return m[k]})}; }
+  function mEntries(map) { return Object.keys(map).sort(function(a,b){return b.localeCompare(a)}).map(function(k){return [k,map[k]]}); }
+
+  var distM=grpMonth(sessions,function(s,p){return Math.round(((p||0)+s.distance)*100)/100});
+  var durM=grpMonth(sessions,function(s,p){return (p||0)+s.duration});
+  var sessM=grpMonth(sessions,function(s,p){return (p||0)+1});
+  var elevM=grpMonth(sessions,function(s,p){return (p||0)+s.elevGain});
+
+  var yd=aggYear(distM,'sum'); barChart(makeCanvas(prefix+'-yearly-charts'),yd.labels,yd.values,'Distance By Year (mi)',COLORS.green1);
+  var ydu=aggYear(durM,'sum'); barChart(makeCanvas(prefix+'-yearly-charts'),ydu.labels,ydu.values,'Duration By Year (min)',COLORS.green3);
+  var ys=aggYear(sessM,'sum'); barChart(makeCanvas(prefix+'-yearly-charts'),ys.labels,ys.values,'Sessions By Year',COLORS.tan);
+  var ye=aggYear(elevM,'sum'); barChart(makeCanvas(prefix+'-yearly-charts'),ye.labels,ye.values,'Elevation Gain By Year (ft)',COLORS.brown);
+
+  var md=mEntries(distM); barChart(makeCanvas(prefix+'-monthly-charts'),md.map(function(e){return e[0]}),md.map(function(e){return e[1]}),'Distance By Month (mi)',COLORS.green1);
+  var mdu=mEntries(durM); barChart(makeCanvas(prefix+'-monthly-charts'),mdu.map(function(e){return e[0]}),mdu.map(function(e){return e[1]}),'Duration By Month (min)',COLORS.green3);
+  var ms=mEntries(sessM); barChart(makeCanvas(prefix+'-monthly-charts'),ms.map(function(e){return e[0]}),ms.map(function(e){return e[1]}),'Sessions By Month',COLORS.tan);
+  var me=mEntries(elevM); barChart(makeCanvas(prefix+'-monthly-charts'),me.map(function(e){return e[0]}),me.map(function(e){return e[1]}),'Elevation Gain By Month (ft)',COLORS.brown);
+
+  var labels=sessions.map(function(s){return s.date});
+  barChart(makeCanvas(prefix+'-session-charts'),labels,sessions.map(function(s){return s.distance}),'Distance Per Session (mi)',COLORS.green1);
+  lineChart(makeCanvas(prefix+'-session-charts'),paced.map(function(s){return s.date}),paced.map(function(s){return s.pace}),'Pace Per Session (min/mi)',COLORS.rust);
+  barChart(makeCanvas(prefix+'-session-charts'),labels,sessions.map(function(s){return s.duration}),'Duration Per Session (min)',COLORS.green3);
+  barChart(makeCanvas(prefix+'-session-charts'),labels,sessions.map(function(s){return s.elevGain}),'Elevation Gain Per Session (ft)',COLORS.brown);
+  barChart(makeCanvas(prefix+'-session-charts'),labels,sessions.map(function(s){return s.calories}),'Calories Per Session',COLORS.olive);
+}
+
 if (typeof INDOOR_DATA !== 'undefined' && typeof BOULDER_DATA !== 'undefined') {
   render(INDOOR_DATA, BOULDER_DATA);
+}
+if (typeof STRENGTH_DATA !== 'undefined' && STRENGTH_DATA && STRENGTH_DATA.length > 0) {
+  renderStrength(STRENGTH_DATA);
+}
+if (typeof CYCLING_DATA !== 'undefined' && CYCLING_DATA && CYCLING_DATA.length > 0) {
+  renderCardio(CYCLING_DATA, 'cycling');
+}
+if (typeof RUNNING_DATA !== 'undefined' && RUNNING_DATA && RUNNING_DATA.length > 0) {
+  renderCardio(RUNNING_DATA, 'running');
 }
 })();
 </script>

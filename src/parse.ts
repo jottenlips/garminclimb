@@ -591,4 +591,380 @@ export const parse = async () => {
   );
 
   console.log("```");
+
+  // === STRENGTH TRAINING ===
+  try {
+    const strengthActivities = JSON.parse(
+      fs.readFileSync(`${garminDataFolder}/strengthTrainingActivities.json`, "utf8"),
+    );
+
+    if (strengthActivities?.length > 0) {
+      console.log("\n```");
+      console.log("\n\nStrength Training ===============================\n");
+
+      // Extract exercise data from each activity
+      // Garmin summarizedExerciseSets uses: category, subCategory, maxWeight (milligrams), reps, volume (milligrams), sets
+      const mgToLbs = (mg: number): number => Math.round((mg / 1000) * 2.20462);
+
+      const exercisePatterns: { [key: string]: { label: string; match: (cat: string, sub: string) => boolean } } = {
+        bench: {
+          label: "Bench Press",
+          match: (cat, sub) => cat === "BENCH_PRESS",
+        },
+        squat: {
+          label: "Back Squat",
+          match: (cat, sub) => cat === "SQUAT" && (sub || "").includes("BACK_SQUAT"),
+        },
+        pullup: {
+          label: "Weighted Pull-Up",
+          match: (cat, sub) => cat === "PULL_UP",
+        },
+        rdl: {
+          label: "Romanian Deadlift",
+          match: (cat, sub) => cat === "DEADLIFT" && (sub || "").includes("ROMANIAN"),
+        },
+      };
+
+      type SessionData = { date: string; maxWeight: number; totalVolume: number; sets: number; totalReps: number };
+      const exerciseData: { [key: string]: SessionData[] } = { bench: [], squat: [], pullup: [], rdl: [] };
+
+      for (const activity of strengthActivities) {
+        const date = activity?.startTimeLocal?.split(" ")[0] || "";
+        const exercises = activity?.exerciseSets || activity?.fullSummarizedExerciseSets || activity?.summarizedExerciseSets || [];
+
+        for (const exKey of Object.keys(exercisePatterns)) {
+          const pattern = exercisePatterns[exKey];
+
+          for (const ex of exercises) {
+            const cat = (ex?.category || "").toUpperCase();
+            const sub = (ex?.subCategory || "").toUpperCase();
+
+            if (pattern.match(cat, sub)) {
+              exerciseData[exKey].push({
+                date,
+                maxWeight: mgToLbs(ex?.maxWeight || 0),
+                totalVolume: mgToLbs(ex?.volume || 0),
+                sets: ex?.sets || 0,
+                totalReps: ex?.reps || 0,
+              });
+            }
+          }
+        }
+      }
+
+      for (const exKey of Object.keys(exercisePatterns)) {
+        const pattern = exercisePatterns[exKey];
+        const sessions = exerciseData[exKey];
+        if (sessions.length === 0) continue;
+
+        console.log(`\n${pattern.label} (${sessions.length} sessions)`);
+        console.log(`  All Time Max Weight: ${Math.max(...sessions.map(s => s.maxWeight))} lbs`);
+        console.log(`  All Time Max Session Volume: ${Math.max(...sessions.map(s => s.totalVolume))} lbs`);
+        console.log(`  Average Max Weight: ${Math.round(sessions.reduce((a, s) => a + s.maxWeight, 0) / sessions.length)} lbs`);
+        console.log(`  Total Reps All Time: ${sessions.reduce((a, s) => a + s.totalReps, 0)}\n`);
+
+        // Per-session max weight
+        generateChart(
+          sessions.map((s, i) => [i, s.maxWeight]),
+          `${pattern.label} - Max Weight Per Session (lbs)`,
+          {
+            width: sessions.length * CHART_WIDTH_PER_DATA_POINT,
+            formatter: (value: number, { axis }: any) =>
+              axis === "y" ? value : sessions[value]?.date,
+          },
+        );
+
+        // Per-session volume
+        generateChart(
+          sessions.map((s, i) => [i, s.totalVolume]),
+          `${pattern.label} - Total Volume Per Session (lbs)`,
+          {
+            height: 10,
+            width: sessions.length * CHART_WIDTH_PER_DATA_POINT,
+            barChart: true,
+            formatter: (value: number, { axis }: any) =>
+              axis === "y" ? value : sessions[value]?.date,
+          },
+        );
+
+        // Monthly max weight
+        const maxWeightByMonth = sessions.reduce((acc: any, s) => {
+          const parts = s.date.split("-");
+          const key = `${parts[0]}-${parts[1]}`;
+          acc[key] = Math.max(acc[key] || 0, s.maxWeight);
+          return acc;
+        }, {});
+
+        generateChart(
+          Object.keys(maxWeightByMonth).map((month, i) => [i, maxWeightByMonth[month]]),
+          `${pattern.label} - Max Weight By Month (lbs)`,
+          {
+            width: YEAR_WIDTH,
+            formatter: (value: number, { axis }: any) =>
+              axis === "y" ? value : Object.keys(maxWeightByMonth)[value],
+          },
+        );
+
+        // Monthly volume
+        const volumeByMonth = sessions.reduce((acc: any, s) => {
+          const parts = s.date.split("-");
+          const key = `${parts[0]}-${parts[1]}`;
+          acc[key] = (acc[key] || 0) + s.totalVolume;
+          return acc;
+        }, {});
+
+        generateChart(
+          Object.keys(volumeByMonth).map((month, i) => [i, volumeByMonth[month]]),
+          `${pattern.label} - Total Volume By Month (lbs)`,
+          {
+            height: 10,
+            width: YEAR_WIDTH,
+            barChart: true,
+            formatter: (value: number, { axis }: any) =>
+              axis === "y" ? value : Object.keys(volumeByMonth)[value],
+          },
+        );
+
+        // Yearly max weight
+        const maxWeightByYear = aggregateByYear(maxWeightByMonth, "max");
+        generateChart(
+          maxWeightByYear.map(([, val], index) => [index, val]),
+          `${pattern.label} - Max Weight By Year (lbs)`,
+          {
+            width: maxWeightByYear.length * 20,
+            formatter: (value: number, { axis }: any) =>
+              axis === "y" ? value : maxWeightByYear[value]?.[0],
+          },
+        );
+
+        // Yearly volume
+        const volumeByYear = aggregateByYear(volumeByMonth);
+        generateChart(
+          volumeByYear.map(([, val], index) => [index, val]),
+          `${pattern.label} - Total Volume By Year (lbs)`,
+          {
+            height: 10,
+            width: volumeByYear.length * 20,
+            barChart: true,
+            formatter: (value: number, { axis }: any) =>
+              axis === "y" ? value : volumeByYear[value]?.[0],
+          },
+        );
+
+        // Per-session reps
+        generateChart(
+          sessions.map((s, i) => [i, s.totalReps]),
+          `${pattern.label} - Total Reps Per Session`,
+          {
+            height: 10,
+            width: sessions.length * CHART_WIDTH_PER_DATA_POINT,
+            barChart: true,
+            formatter: (value: number, { axis }: any) =>
+              axis === "y" ? value : sessions[value]?.date,
+          },
+        );
+
+        // Monthly reps
+        const repsByMonth = sessions.reduce((acc: any, s) => {
+          const parts = s.date.split("-");
+          const key = `${parts[0]}-${parts[1]}`;
+          acc[key] = (acc[key] || 0) + s.totalReps;
+          return acc;
+        }, {});
+
+        generateChart(
+          Object.keys(repsByMonth).map((month, i) => [i, repsByMonth[month]]),
+          `${pattern.label} - Total Reps By Month`,
+          {
+            height: 10,
+            width: YEAR_WIDTH,
+            barChart: true,
+            formatter: (value: number, { axis }: any) =>
+              axis === "y" ? value : Object.keys(repsByMonth)[value],
+          },
+        );
+
+        // Yearly reps
+        const repsByYear = aggregateByYear(repsByMonth);
+        generateChart(
+          repsByYear.map(([, val], index) => [index, val]),
+          `${pattern.label} - Total Reps By Year`,
+          {
+            height: 10,
+            width: repsByYear.length * 20,
+            barChart: true,
+            formatter: (value: number, { axis }: any) =>
+              axis === "y" ? value : repsByYear[value]?.[0],
+          },
+        );
+      }
+      console.log("```");
+    }
+  } catch (e) {
+    // No strength training data available, skip
+  }
+
+  // === RUNNING & CYCLING ===
+  const cardioTypes = [
+    { file: "cyclingActivities.json", label: "Cycling", unit: "mi" },
+    { file: "runningActivities.json", label: "Running", unit: "mi" },
+  ];
+
+  for (const cardio of cardioTypes) {
+    try {
+      const activities = JSON.parse(
+        fs.readFileSync(`${garminDataFolder}/${cardio.file}`, "utf8"),
+      );
+      if (!activities?.length) continue;
+
+      console.log("\n```");
+      console.log(`\n\n${cardio.label} ===============================\n`);
+
+      const metersToMiles = (m: number): number => Math.round((m / 1609.344) * 100) / 100;
+      const secondsToMinutes = (s: number): number => Math.round(s / 60);
+      const pacePerMile = (dist: number, dur: number): number => {
+        const miles = dist / 1609.344;
+        if (miles === 0) return 0;
+        return Math.round((dur / 60) / miles * 100) / 100; // min/mile
+      };
+
+      type CardioSession = { date: string; distance: number; duration: number; pace: number; calories: number; avgHR: number; elevGain: number };
+      const sessions: CardioSession[] = activities.map((a: any) => ({
+        date: a?.startTimeLocal?.split(" ")[0] || "",
+        distance: metersToMiles(a?.distance || 0),
+        duration: secondsToMinutes(a?.duration || 0),
+        pace: pacePerMile(a?.distance || 0, a?.duration || 0),
+        calories: a?.calories || 0,
+        avgHR: a?.averageHR || 0,
+        elevGain: metersToFeet(a?.elevationGain || 0),
+      }));
+
+      const totalDist = Math.round(sessions.reduce((a, s) => a + s.distance, 0) * 100) / 100;
+      const totalTime = sessions.reduce((a, s) => a + s.duration, 0);
+      const avgPace = Math.round(sessions.filter(s => s.pace > 0).reduce((a, s) => a + s.pace, 0) / sessions.filter(s => s.pace > 0).length * 100) / 100;
+      const bestPace = Math.round(Math.min(...sessions.filter(s => s.pace > 0).map(s => s.pace)) * 100) / 100;
+      const totalCalories = sessions.reduce((a, s) => a + s.calories, 0);
+
+      console.log(`${cardio.label} (${sessions.length} sessions)`);
+      console.log(`  Total Distance: ${totalDist} ${cardio.unit}`);
+      console.log(`  Total Time: ${totalTime} min (${Math.round(totalTime / 60)} hrs)`);
+      console.log(`  Average Pace: ${avgPace} min/${cardio.unit}`);
+      console.log(`  Best Pace: ${bestPace} min/${cardio.unit}`);
+      console.log(`  Total Calories: ${totalCalories}\n`);
+
+      // Per-session distance
+      generateChart(
+        sessions.map((s, i) => [i, s.distance]),
+        `${cardio.label} - Distance Per Session (${cardio.unit})`,
+        {
+          height: 10,
+          width: sessions.length * CHART_WIDTH_PER_DATA_POINT,
+          barChart: true,
+          formatter: (value: number, { axis }: any) =>
+            axis === "y" ? value : sessions[value]?.date,
+        },
+      );
+
+      // Per-session pace
+      generateChart(
+        sessions.filter(s => s.pace > 0).map((s, i) => [i, s.pace]),
+        `${cardio.label} - Pace Per Session (min/${cardio.unit})`,
+        {
+          width: sessions.filter(s => s.pace > 0).length * CHART_WIDTH_PER_DATA_POINT,
+          formatter: (value: number, { axis }: any) =>
+            axis === "y" ? value : sessions.filter(s => s.pace > 0)[value]?.date,
+        },
+      );
+
+      // Per-session duration
+      generateChart(
+        sessions.map((s, i) => [i, s.duration]),
+        `${cardio.label} - Duration Per Session (min)`,
+        {
+          height: 10,
+          width: sessions.length * CHART_WIDTH_PER_DATA_POINT,
+          barChart: true,
+          formatter: (value: number, { axis }: any) =>
+            axis === "y" ? value : sessions[value]?.date,
+        },
+      );
+
+      // Monthly aggregations
+      const groupByMonth = (fn: (s: CardioSession, prev: number) => number) =>
+        sessions.reduce((acc: any, s) => {
+          const parts = s.date.split("-");
+          const key = `${parts[0]}-${parts[1]}`;
+          acc[key] = fn(s, acc[key] || 0);
+          return acc;
+        }, {});
+
+      const distByMonth = groupByMonth((s, prev) => Math.round((prev + s.distance) * 100) / 100);
+      const durationByMonth = groupByMonth((s, prev) => prev + s.duration);
+      const sessionsByMonth = groupByMonth((s, prev) => prev + 1);
+
+      generateChart(
+        Object.keys(distByMonth).map((m, i) => [i, distByMonth[m]]),
+        `${cardio.label} - Distance By Month (${cardio.unit})`,
+        {
+          height: 10, width: YEAR_WIDTH, barChart: true,
+          formatter: (value: number, { axis }: any) => axis === "y" ? value : Object.keys(distByMonth)[value],
+        },
+      );
+
+      generateChart(
+        Object.keys(durationByMonth).map((m, i) => [i, durationByMonth[m]]),
+        `${cardio.label} - Duration By Month (min)`,
+        {
+          height: 10, width: YEAR_WIDTH, barChart: true,
+          formatter: (value: number, { axis }: any) => axis === "y" ? value : Object.keys(durationByMonth)[value],
+        },
+      );
+
+      generateChart(
+        Object.keys(sessionsByMonth).map((m, i) => [i, sessionsByMonth[m]]),
+        `${cardio.label} - Sessions By Month`,
+        {
+          height: 10, width: YEAR_WIDTH, barChart: true,
+          formatter: (value: number, { axis }: any) => axis === "y" ? value : Object.keys(sessionsByMonth)[value],
+        },
+      );
+
+      // Yearly
+      console.log("\nYearly Stats ===============================\n");
+
+      const distByYear = aggregateByYear(distByMonth);
+      generateChart(
+        distByYear.map(([, val], i) => [i, val]),
+        `${cardio.label} - Distance By Year (${cardio.unit})`,
+        {
+          height: 10, width: distByYear.length * 20, barChart: true,
+          formatter: (value: number, { axis }: any) => axis === "y" ? value : distByYear[value]?.[0],
+        },
+      );
+
+      const durationByYear = aggregateByYear(durationByMonth);
+      generateChart(
+        durationByYear.map(([, val], i) => [i, val]),
+        `${cardio.label} - Duration By Year (min)`,
+        {
+          height: 10, width: durationByYear.length * 20, barChart: true,
+          formatter: (value: number, { axis }: any) => axis === "y" ? value : durationByYear[value]?.[0],
+        },
+      );
+
+      const sessionsByYear = aggregateByYear(sessionsByMonth);
+      generateChart(
+        sessionsByYear.map(([, val], i) => [i, val]),
+        `${cardio.label} - Sessions By Year`,
+        {
+          height: 10, width: sessionsByYear.length * 20, barChart: true,
+          formatter: (value: number, { axis }: any) => axis === "y" ? value : sessionsByYear[value]?.[0],
+        },
+      );
+
+      console.log("```");
+    } catch (e) {
+      // No data for this cardio type
+    }
+  }
 };

@@ -112,10 +112,30 @@ export const download = async (
     "cycling",
   );
 
-  const filteredCycling = (cyclingActivities || []).filter(
+  // Download mountain biking activities
+  const mtbActivities = await GCClient.getActivities(
+    0,
+    6000,
+    // @ts-ignore
+    "mountain_biking",
+  );
+
+  const mtbActivities2 = await GCClient.getActivities(
+    0,
+    6000,
+    // @ts-ignore
+    "mtb",
+  );
+
+  const allCycling = [...(cyclingActivities || []), ...(mtbActivities || []), ...(mtbActivities2 || [])];
+  const seen = new Set<number>();
+  const filteredCycling = allCycling.filter(
     (a: any) => {
       const key = a?.activityType?.typeKey || "";
-      return key.includes("cycling") || key.includes("biking") || key === "virtual_ride";
+      const id = a?.activityId;
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return key.includes("cycling") || key.includes("biking") || key === "virtual_ride" || key.includes("mtb");
     }
   );
 
@@ -123,5 +143,5 @@ export const download = async (
     `${garminDataFolder}/cyclingActivities.json`,
     JSON.stringify(filteredCycling, null, 2)
   );
-  console.log(`Downloaded ${filteredCycling.length} cycling activities from Garmin Connect`);
+  console.log(`Downloaded ${filteredCycling.length} cycling + MTB activities from Garmin Connect`);
 };

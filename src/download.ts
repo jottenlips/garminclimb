@@ -112,22 +112,16 @@ export const download = async (
     "cycling",
   );
 
-  // Download mountain biking activities
+  // Download mountain biking activities using correct subtype
   const mtbActivities = await GCClient.getActivities(
     0,
     6000,
     // @ts-ignore
+    "cycling",
     "mountain_biking",
   );
 
-  const mtbActivities2 = await GCClient.getActivities(
-    0,
-    6000,
-    // @ts-ignore
-    "mtb",
-  );
-
-  const allCycling = [...(cyclingActivities || []), ...(mtbActivities || []), ...(mtbActivities2 || [])];
+  const allCycling = [...(cyclingActivities || []), ...(mtbActivities || [])];
   const seen = new Set<number>();
   const filteredCycling = allCycling.filter(
     (a: any) => {

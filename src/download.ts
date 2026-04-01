@@ -6,6 +6,28 @@ import {
   ActivitySubType,
   ActivityType,
 } from "garmin-connect/dist/garmin/types/activity";
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const DELAY = 3000; // 3s between bulk requests
+
+async function withRetry<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fn();
+    } catch (e: any) {
+      const is429 = e?.message?.includes("429") || e?.message?.includes("Rate");
+      if (is429 && i < retries - 1) {
+        const wait = DELAY * (i + 2);
+        console.log(`Rate limited, retrying in ${wait / 1000}s...`);
+        await sleep(wait);
+      } else {
+        throw e;
+      }
+    }
+  }
+  throw new Error("Unreachable");
+}
+
 export const download = async (
   username: string,
   password: string
@@ -17,13 +39,13 @@ export const download = async (
 
   await GCClient.login(username, password);
 
-  const activities = await GCClient.getActivities(
+  const activities = await withRetry(() => GCClient.getActivities(
     0,
     6000,
     ActivityType.FitnessEquipment,
     // @ts-ignore
     "indoor_climbing"
-  );
+  ));
 
   const indoorClimbingActivities = activities?.filter(
     (activity) => activity?.activityType?.typeKey === "indoor_climbing"
@@ -48,13 +70,14 @@ export const download = async (
   console.log("Downloaded climbing activities from Garmin Connect");
 
   // Download strength training activities
-  const strengthActivities = await GCClient.getActivities(
+  await sleep(DELAY);
+  const strengthActivities = await withRetry(() => GCClient.getActivities(
     0,
     6000,
     ActivityType.FitnessEquipment,
     // @ts-ignore
     "strength_training"
-  );
+  ));
 
   const strengthTrainingActivities = strengthActivities?.filter(
     (activity: any) => activity?.activityType?.typeKey === "strength_training"
@@ -65,7 +88,8 @@ export const download = async (
   const detailedActivities: any[] = [];
   for (const activity of strengthTrainingActivities || []) {
     try {
-      const detail: any = await GCClient.getActivity({ activityId: activity.activityId });
+      await sleep(1000);
+      const detail: any = await withRetry(() => GCClient.getActivity({ activityId: activity.activityId }));
       detailedActivities.push({
         ...activity,
         exerciseSets: detail?.exerciseSets || detail?.summarizedExerciseSets || (activity as any)?.summarizedExerciseSets || [],
@@ -84,12 +108,13 @@ export const download = async (
   console.log("Downloaded strength training activities from Garmin Connect");
 
   // Download running activities (street_running gets all running subtypes)
-  const runningActivities = await GCClient.getActivities(
+  await sleep(DELAY);
+  const runningActivities = await withRetry(() => GCClient.getActivities(
     0,
     6000,
     // @ts-ignore
     "running",
-  );
+  ));
 
   const filteredRunning = (runningActivities || []).filter(
     (a: any) => {
@@ -105,21 +130,23 @@ export const download = async (
   console.log(`Downloaded ${filteredRunning.length} running activities from Garmin Connect`);
 
   // Download cycling activities
-  const cyclingActivities = await GCClient.getActivities(
+  await sleep(DELAY);
+  const cyclingActivities = await withRetry(() => GCClient.getActivities(
     0,
     6000,
     // @ts-ignore
     "cycling",
-  );
+  ));
 
   // Download mountain biking activities using correct subtype
-  const mtbActivities = await GCClient.getActivities(
+  await sleep(DELAY);
+  const mtbActivities = await withRetry(() => GCClient.getActivities(
     0,
     6000,
     // @ts-ignore
     "cycling",
     "mountain_biking",
-  );
+  ));
 
   const allCycling = [...(cyclingActivities || []), ...(mtbActivities || [])];
   const seen = new Set<number>();
